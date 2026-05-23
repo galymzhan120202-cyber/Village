@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, RefreshControl, Linking, Vibration, Platform, Modal,
+  StyleSheet, Alert, ActivityIndicator, RefreshControl,
+  Linking, Vibration, Platform, Modal,
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -20,9 +21,16 @@ Notifications.setNotificationHandler({
   }),
 });
 
+const QUICK = [
+  { key: 'Map',      icon: '🗺️', label: 'Карта',    color: '#3B82F6', bg: '#EFF6FF' },
+  { key: 'Earnings', icon: '💰', label: 'Табыс',    color: '#10B981', bg: '#ECFDF5' },
+  { key: 'History',  icon: '📋', label: 'Тарих',    color: '#8B5CF6', bg: '#F5F3FF' },
+  { key: 'Profile',  icon: '👤', label: 'Профиль', color: '#F59E0B', bg: '#FFFBEB' },
+];
+
 export default function HomeDriverScreen({ navigation }) {
-  const { user, logout } = useAuth();
-  const { isOffline }    = useNetwork();
+  const { user }    = useAuth();
+  const { isOffline } = useNetwork();
 
   const [profile,      setProfile]      = useState(null);
   const [availOrders,  setAvailOrders]  = useState([]);
@@ -47,7 +55,10 @@ export default function HomeDriverScreen({ navigation }) {
     } else {
       stopLocationTracking();
       stopBackgroundLocation();
-      if (ordersIntervalRef.current) { clearInterval(ordersIntervalRef.current); ordersIntervalRef.current = null; }
+      if (ordersIntervalRef.current) {
+        clearInterval(ordersIntervalRef.current);
+        ordersIntervalRef.current = null;
+      }
     }
     return () => {
       stopLocationTracking();
@@ -86,7 +97,10 @@ export default function HomeDriverScreen({ navigation }) {
   }
 
   function stopLocationTracking() {
-    if (locationIntervalRef.current) { clearInterval(locationIntervalRef.current); locationIntervalRef.current = null; }
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+    }
   }
 
   async function sendLocation() {
@@ -142,9 +156,9 @@ export default function HomeDriverScreen({ navigation }) {
   }
 
   async function stopWork() {
-    Alert.alert('Тоқтату', 'Жұмысты аяқтайсыз ба?', [
+    Alert.alert('Жұмысты тоқтату', 'Тапсырыс қабылдауды тоқтатасыз ба?', [
       { text: 'Жоқ' },
-      { text: 'Иә', style: 'destructive', onPress: async () => { await driverAPI.stopWork(); loadData(); } },
+      { text: 'Иә, тоқтату', style: 'destructive', onPress: async () => { await driverAPI.stopWork(); loadData(); } },
     ]);
   }
 
@@ -159,12 +173,11 @@ export default function HomeDriverScreen({ navigation }) {
   }
 
   async function finishOrder(id) {
-    Alert.alert('Растау', 'Тапсырысты аяқтайсыз ба?', [
+    Alert.alert('Растау', 'Жолаушыны түсірдіңіз бе?', [
       { text: 'Жоқ' },
-      { text: 'Иә', onPress: async () => {
+      { text: 'Иә, аяқтау', onPress: async () => {
         try {
           await ordersAPI.finish(id);
-          Alert.alert('✅ Аяқталды', 'Тапсырыс аяқталды');
           loadData();
         } catch (e) { Alert.alert('Қате', e.response?.data?.detail || 'Қате'); }
       }},
@@ -172,7 +185,7 @@ export default function HomeDriverScreen({ navigation }) {
   }
 
   async function dropOrder(id) {
-    Alert.alert('Бас тарту', 'Тапсырысты тастайсыз ба?', [
+    Alert.alert('Бас тарту', 'Тапсырыстан бас тартасыз ба?', [
       { text: 'Жоқ' },
       { text: 'Иә', style: 'destructive', onPress: async () => {
         try { await ordersAPI.drop(id); loadData(); }
@@ -181,391 +194,506 @@ export default function HomeDriverScreen({ navigation }) {
     ]);
   }
 
-  function navigate(address) {
-    const encoded = encodeURIComponent(address);
-    const url = Platform.OS === 'ios'
-      ? `maps://?q=${encoded}`
-      : `geo:0,0?q=${encoded}`;
+  function openMaps(address) {
+    const q = encodeURIComponent(address);
+    const url = Platform.OS === 'ios' ? `maps://?q=${q}` : `geo:0,0?q=${q}`;
     Linking.openURL(url).catch(() =>
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encoded}`)
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`)
     );
   }
 
   if (loading && !profile) {
-    return <View style={s.center}><ActivityIndicator size="large" color="#FF6B35" /></View>;
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color="#FF6B35" />
+      </View>
+    );
   }
 
-  return (
-    <ScrollView
-      style={s.screen}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#FF6B35" />}
-    >
+  const isOnline = !!profile?.is_online;
 
+  return (
+    <>
       {/* ── ЖҰМЫСҚА ШЫҒУ МОДАЛЫ ── */}
       <Modal visible={showForm} transparent animationType="slide" onRequestClose={() => setShowForm(false)}>
         <View style={s.overlay}>
           <TouchableOpacity style={s.overlayBg} activeOpacity={1} onPress={() => setShowForm(false)} />
-          <View style={s.startSheet}>
+          <View style={s.sheet}>
             <View style={s.sheetHandle} />
 
-            <View style={s.sheetTitleRow}>
-              <View style={s.sheetIconWrap}>
-                <Text style={{ fontSize: 28 }}>🚗</Text>
-              </View>
-              <View>
-                <Text style={s.sheetTitle}>Жұмысқа шығу</Text>
-                <Text style={s.sheetSub}>Орын санын таңдап, бастаңыз</Text>
-              </View>
+            <Text style={s.sheetTitle}>🚗  Жұмысқа шығу</Text>
+            <Text style={s.sheetSub}>Машинаңыздың орын санын таңдаңыз</Text>
+
+            {/* Тек 4 немесе 6 */}
+            <View style={s.seatRow}>
+              <TouchableOpacity
+                style={[s.seatCard, seats === 4 && s.seatCardOn]}
+                onPress={() => setSeats(4)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.seatCardEmoji}>🚗</Text>
+                <Text style={[s.seatCardNum, seats === 4 && s.seatCardNumOn]}>4</Text>
+                <Text style={[s.seatCardLbl, seats === 4 && s.seatCardLblOn]}>орын</Text>
+                <Text style={[s.seatCardSub, seats === 4 && s.seatCardSubOn]}>Жеңіл авто</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[s.seatCard, seats === 6 && s.seatCardOn]}
+                onPress={() => setSeats(6)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.seatCardEmoji}>🚐</Text>
+                <Text style={[s.seatCardNum, seats === 6 && s.seatCardNumOn]}>6</Text>
+                <Text style={[s.seatCardLbl, seats === 6 && s.seatCardLblOn]}>орын</Text>
+                <Text style={[s.seatCardSub, seats === 6 && s.seatCardSubOn]}>Микроавтобус</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Қосылатын мүмкіндіктер */}
-            <View style={s.featureRow}>
-              <View style={s.featureBadge}><Text style={s.featureTxt}>✓  Барлық маршруттар</Text></View>
-              <View style={s.featureBadge}><Text style={s.featureTxt}>✓  Барлық ауылдар</Text></View>
-              <View style={s.featureBadge}><Text style={s.featureTxt}>✓  Сәлемдеме</Text></View>
+            {/* Қосылатындар */}
+            <View style={s.includeBox}>
+              <Text style={s.includeTxt}>✓  Барлық маршруттар</Text>
+              <Text style={s.includeTxt}>✓  Барлық ауылдар</Text>
+              <Text style={s.includeTxt}>✓  Сәлемдеме жеткізу</Text>
             </View>
 
-            <Text style={s.seatsLabel}>Орын санын таңдаңыз</Text>
-
-            <View style={s.seatsGrid}>
-              {[1, 2, 3, 4, 5, 6].map((n) => {
-                const on = seats === n;
-                return (
-                  <TouchableOpacity key={n} style={[s.seatTile, on && s.seatTileOn]} onPress={() => setSeats(n)}>
-                    <Text style={[s.seatTileNum, on && s.seatTileNumOn]}>{n}</Text>
-                    <Text style={s.seatTileIcon}>
-                      {n <= 3 ? '👤'.repeat(n) : `👤×${n}`}
-                    </Text>
-                    <Text style={[s.seatTileLbl, on && s.seatTileLblOn]}>орын</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TouchableOpacity style={s.goWorkBtn} onPress={startWork}>
-              <Text style={s.goWorkTxt}>🚀  Жұмысты бастау</Text>
+            <TouchableOpacity style={s.startBtn} onPress={startWork}>
+              <Text style={s.startBtnTxt}>🚀  Жұмысты бастау</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={s.cancelWorkBtn} onPress={() => setShowForm(false)}>
-              <Text style={s.cancelWorkTxt}>Болдырмау</Text>
+            <TouchableOpacity style={s.cancelBtn} onPress={() => setShowForm(false)}>
+              <Text style={s.cancelBtnTxt}>Болдырмау</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ── HEADER ── */}
-      <View style={s.header}>
-        <View style={s.headerLeft}>
-          <Text style={s.name}>{user?.name}</Text>
-          <View style={s.statusRow}>
-            <View style={[s.statusDot, { backgroundColor: profile?.is_online ? '#10B981' : '#EF4444' }]} />
-            <Text style={s.statusTxt}>{profile?.is_online ? 'Жұмыста' : 'Оффлайн'}</Text>
-            <Text style={s.statusSep}>·</Text>
-            <Text style={s.statusTxt}>⭐ {profile?.rating ?? '5.0'}</Text>
-          </View>
-        </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={s.avatarBtn}>
-          <Text style={s.avatarTxt}>{(user?.name || 'D')[0].toUpperCase()}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {isOffline && (
-        <View style={s.offlineBanner}>
-          <Text style={s.offlineTxt}>📵 Интернет жоқ</Text>
-        </View>
-      )}
-
-      {/* ── ЖҰМЫС БАСҚАРМАСЫ ── */}
-      {profile?.is_online ? (
-        <View style={s.onlineCard}>
-          <View style={s.onlineInfo}>
-            <View style={[s.onlineDot]} />
-            <View>
-              <Text style={s.onlineTitle}>Жұмыста 🟢</Text>
-              <Text style={s.onlineSub}>{profile?.current_seats ?? seats} орын · Барлық маршрут</Text>
+      <ScrollView
+        style={s.screen}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#FF6B35" />
+        }
+      >
+        {/* ── HEADER ── */}
+        <View style={s.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.headerName}>{user?.name}</Text>
+            <View style={s.headerStatus}>
+              <View style={[s.headerDot, { backgroundColor: isOnline ? '#10B981' : '#9CA3AF' }]} />
+              <Text style={s.headerStatusTxt}>
+                {isOnline ? 'Жұмыста' : 'Оффлайн'}
+              </Text>
+              <Text style={s.headerSep}>·</Text>
+              <Text style={s.headerRating}>⭐ {profile?.rating ?? '5.0'}</Text>
             </View>
           </View>
-          <View style={s.onlineBtns}>
-            <TouchableOpacity style={s.earningsMiniBtn} onPress={() => navigation.navigate('Earnings')}>
-              <Text style={s.earningsMiniBtnTxt}>💰 Табыс</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.stopMiniBtn} onPress={stopWork}>
-              <Text style={s.stopMiniBtnTxt}>🛑 Тоқтату</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={s.avatarBtn}>
+            <Text style={s.avatarTxt}>{(user?.name || 'D')[0].toUpperCase()}</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <View style={s.offlineCard}>
-          <View style={s.offlineCardLeft}>
-            <Text style={s.offlineCardTitle}>Жұмысқа шығыңыз</Text>
-            <Text style={s.offlineCardSub}>Тапсырыс қабылдауды бастаңыз</Text>
-          </View>
-          <View style={s.offlineCardBtns}>
-            <TouchableOpacity style={s.earningsOutlineBtn} onPress={() => navigation.navigate('Earnings')}>
-              <Text style={s.earningsOutlineTxt}>💰</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.startCardBtn} onPress={() => setShowForm(true)}>
-              <Text style={s.startCardBtnTxt}>🚀 Бастау</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
 
-      {/* ── МЕНІҢ ЖОЛАУШЫЛАРЫМ ── */}
-      {myPassengers.length > 0 && (
-        <>
-          <Text style={s.sectionTitle}>👥 Жолаушыларым ({myPassengers.length})</Text>
-          {myPassengers.map((p) => {
-            const fromAddr = p.landmark || p.village || '—';
-            const toAddr   = p.to_loc || '—';
-            return (
-              <View key={p.id} style={s.pasCard}>
-                {/* Жолаушы аты + телефон */}
-                <View style={s.pasTop}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.pasName}>{p.passenger_name}</Text>
-                    <Text style={s.pasType}>
-                      {p.order_type === 'delivery' ? '📦 Сәлемдеме' : '🚖 Такси'}
-                      {'  ·  '}
-                      <Text style={s.pasPrice}>💰 {p.price} тг</Text>
-                    </Text>
+        {isOffline && (
+          <View style={s.offlineBanner}>
+            <Text style={s.offlineTxt}>📵 Интернет байланысы жоқ</Text>
+          </View>
+        )}
+
+        {/* ── АПТАЛЫҚ СТАТИСТИКА ── */}
+        <View style={s.statsCard}>
+          <View style={s.statItem}>
+            <Text style={s.statNum}>{profile?.weekly_completed ?? 0}</Text>
+            <Text style={s.statLbl}>Тапсырыс</Text>
+          </View>
+          <View style={s.statDivider} />
+          <View style={s.statItem}>
+            <Text style={[s.statNum, { color: '#10B981' }]}>{profile?.weekly_income ?? 0} ₸</Text>
+            <Text style={s.statLbl}>Апталық</Text>
+          </View>
+          <View style={s.statDivider} />
+          <View style={s.statItem}>
+            <Text style={[s.statNum, { color: '#F59E0B' }]}>{profile?.rating ?? '5.0'}</Text>
+            <Text style={s.statLbl}>Рейтинг</Text>
+          </View>
+        </View>
+
+        {/* ── ЖҰМЫС КҮЙІ ── */}
+        {isOnline ? (
+          <View style={s.onlineCard}>
+            <View style={s.onlinePulse}>
+              <View style={s.onlinePulseInner} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={s.onlineTitle}>Жұмыста</Text>
+              <Text style={s.onlineSub}>{profile?.current_seats ?? seats} орын · Тапсырыс күтілуде</Text>
+            </View>
+            <TouchableOpacity style={s.stopBtn} onPress={stopWork}>
+              <Text style={s.stopBtnTxt}>Тоқтату</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={s.offlineCard} onPress={() => setShowForm(true)} activeOpacity={0.85}>
+            <View style={s.offlineCardIcon}>
+              <Text style={{ fontSize: 26 }}>🚗</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={s.offlineCardTitle}>Жұмысқа шығу</Text>
+              <Text style={s.offlineCardSub}>Тапсырыс қабылдауды бастаңыз</Text>
+            </View>
+            <View style={s.offlineCardArrow}>
+              <Text style={s.offlineCardArrowTxt}>›</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* ── QUICK ACTIONS ── */}
+        <View style={s.quickGrid}>
+          {QUICK.map((q) => (
+            <TouchableOpacity
+              key={q.key}
+              style={[s.quickTile, { backgroundColor: q.bg }]}
+              onPress={() => navigation.navigate(q.key)}
+              activeOpacity={0.75}
+            >
+              <Text style={s.quickIcon}>{q.icon}</Text>
+              <Text style={[s.quickLabel, { color: q.color }]}>{q.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── ЖОЛАУШЫЛАР ── */}
+        {myPassengers.length > 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>👥 Жолаушыларым</Text>
+            {myPassengers.map((p) => {
+              const from = p.landmark || p.village || '—';
+              const to   = p.to_loc || '—';
+              return (
+                <View key={p.id} style={s.pasCard}>
+                  <View style={s.pasTop}>
+                    <View style={s.pasAvatar}>
+                      <Text style={{ fontSize: 20 }}>👤</Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={s.pasName}>{p.passenger_name}</Text>
+                      <Text style={s.pasInfo}>
+                        {p.order_type === 'delivery' ? '📦 Сәлемдеме' : '🚖 Такси'}
+                        {'  '}
+                        <Text style={s.pasPrice}>{p.price} ₸</Text>
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={s.callBtn}
+                      onPress={() => Linking.openURL(`tel:${p.passenger_phone}`)}
+                    >
+                      <Text style={{ fontSize: 20 }}>📞</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity style={s.callBtn}
-                    onPress={() => Linking.openURL(`tel:${p.passenger_phone}`)}>
-                    <Text style={s.callTxt}>📞</Text>
-                  </TouchableOpacity>
-                </View>
 
-                {/* Маршрут + навигация */}
-                <View style={s.routeRow}>
-                  <View style={{ flex: 1 }}>
-                    <View style={s.addrLine}>
+                  <View style={s.routeBlock}>
+                    <View style={s.routeLine}>
                       <View style={[s.dot, { backgroundColor: '#10B981' }]} />
-                      <Text style={s.addrTxt} numberOfLines={1}>{fromAddr}</Text>
+                      <Text style={s.routeTxt} numberOfLines={1}>{from}</Text>
+                      <TouchableOpacity style={s.navBtn} onPress={() => openMaps(from)}>
+                        <Text style={s.navTxt}>🗺️</Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={s.addrLine}>
+                    <View style={s.routeLine}>
                       <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
-                      <Text style={s.addrTxt} numberOfLines={1}>{toAddr}</Text>
+                      <Text style={s.routeTxt} numberOfLines={1}>{to}</Text>
                     </View>
                   </View>
-                  <TouchableOpacity style={s.navBtn} onPress={() => navigate(fromAddr)}>
-                    <Text style={s.navTxt}>🗺️</Text>
-                    <Text style={s.navLabel}>Нав.</Text>
-                  </TouchableOpacity>
-                </View>
 
-                {/* Батырмалар */}
-                <View style={s.pasBtns}>
-                  <TouchableOpacity style={[s.pasBtn, s.chatPasBtn]}
-                    onPress={() => {
-                      setUnreadChats(prev => { const n = new Set(prev); n.delete(p.id); return n; });
-                      navigation.navigate('Chat', { orderId: p.id, otherName: p.passenger_name });
-                    }}>
-                    <Text style={s.pasBtnTxt}>💬 Чат{unreadChats.has(p.id) ? ' 🔴' : ''}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.pasBtn, s.finishPasBtn]} onPress={() => finishOrder(p.id)}>
-                    <Text style={s.pasBtnTxt}>✅ Түсірдім</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.pasBtn, s.dropPasBtn]} onPress={() => dropOrder(p.id)}>
-                    <Text style={s.pasBtnTxt}>❌</Text>
-                  </TouchableOpacity>
+                  <View style={s.pasBtns}>
+                    <TouchableOpacity
+                      style={[s.pasBtn, { backgroundColor: '#EFF6FF' }]}
+                      onPress={() => {
+                        setUnreadChats(prev => { const n = new Set(prev); n.delete(p.id); return n; });
+                        navigation.navigate('Chat', { orderId: p.id, otherName: p.passenger_name });
+                      }}
+                    >
+                      <Text style={[s.pasBtnTxt, { color: '#3B82F6' }]}>
+                        💬 Чат{unreadChats.has(p.id) ? ' 🔴' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.pasBtn, { backgroundColor: '#ECFDF5' }]}
+                      onPress={() => finishOrder(p.id)}
+                    >
+                      <Text style={[s.pasBtnTxt, { color: '#059669' }]}>✅ Түсірдім</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.pasBtn, { backgroundColor: '#FEF2F2', flex: 0, paddingHorizontal: 14 }]}
+                      onPress={() => dropOrder(p.id)}
+                    >
+                      <Text style={{ fontSize: 16 }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ── ТАПСЫРЫСТАР ── */}
+        {isOnline && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>
+              📥 Тапсырыстар{availOrders.length > 0 ? ` (${availOrders.length})` : ''}
+            </Text>
+            {availOrders.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={s.emptyEmoji}>🔍</Text>
+                <Text style={s.emptyTitle}>Тапсырыс күтілуде</Text>
+                <Text style={s.emptySub}>Жаңа тапсырыс келгенде вибрация береді</Text>
               </View>
-            );
-          })}
-        </>
-      )}
+            ) : (
+              availOrders.map((o) => (
+                <View key={o.id} style={s.orderCard}>
+                  <View style={s.orderTop}>
+                    <View style={s.orderTypePill}>
+                      <Text style={s.orderTypeEmoji}>
+                        {o.order_type === 'delivery' ? '📦' : '🚖'}
+                      </Text>
+                      <Text style={s.orderTypeTxt}>
+                        {o.order_type === 'delivery' ? 'Сәлемдеме' : `Такси · ${o.seats} орын`}
+                      </Text>
+                    </View>
+                    <Text style={s.orderPrice}>{o.price} ₸</Text>
+                  </View>
 
-      {/* ── ҚОЛЖЕТІМДІ ТАПСЫРЫСТАР ── */}
-      {profile?.is_online && (
-        <>
-          <Text style={s.sectionTitle}>📥 Тапсырыстар ({availOrders.length})</Text>
-          {availOrders.length === 0 ? (
-            <View style={s.emptyCard}>
-              <Text style={s.emptyTxt}>Тапсырыс жоқ, күтуде...</Text>
-            </View>
-          ) : (
-            availOrders.map((o) => (
-              <View key={o.id} style={s.orderCard}>
-                <View style={s.orderTop}>
-                  <Text style={s.orderType}>
-                    {o.order_type === 'delivery' ? '📦 Сәлемдеме' : `🚖 Такси (${o.seats} орын)`}
-                  </Text>
-                  <Text style={s.orderPrice}>💰 {o.price} тг</Text>
-                </View>
-                <View style={s.addrLine}>
-                  <View style={[s.dot, { backgroundColor: '#10B981' }]} />
-                  <Text style={s.addrTxt} numberOfLines={1}>{o.from}</Text>
-                </View>
-                <View style={s.addrLine}>
-                  <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
-                  <Text style={s.addrTxt} numberOfLines={1}>{o.to}</Text>
-                </View>
-                {o.comment ? <Text style={s.orderComment}>📝 {o.comment}</Text> : null}
-                <TouchableOpacity style={s.acceptBtn} onPress={() => acceptOrder(o.id)}>
-                  <Text style={s.acceptTxt}>✅  Қабылдау</Text>
-                </TouchableOpacity>
-              </View>
-            ))
-          )}
-        </>
-      )}
+                  <View style={s.routeBlock}>
+                    <View style={s.routeLine}>
+                      <View style={[s.dot, { backgroundColor: '#10B981' }]} />
+                      <Text style={s.routeTxt} numberOfLines={1}>{o.from}</Text>
+                    </View>
+                    <View style={s.routeLine}>
+                      <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
+                      <Text style={s.routeTxt} numberOfLines={1}>{o.to}</Text>
+                    </View>
+                  </View>
 
-      {/* ── ТӨМЕНГІ БАТЫРМАЛАР ── */}
-      <View style={s.bottomRow}>
-        <TouchableOpacity style={[s.bottomBtn, { backgroundColor: '#3B82F6' }]}
-          onPress={() => navigation.navigate('Map')}>
-          <Text style={s.bottomTxt}>🗺️  Карта</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.bottomBtn, { backgroundColor: '#8B5CF6' }]}
-          onPress={() => navigation.navigate('History')}>
-          <Text style={s.bottomTxt}>📋  Тарих</Text>
-        </TouchableOpacity>
-      </View>
+                  {o.comment ? (
+                    <Text style={s.orderComment}>💬 {o.comment}</Text>
+                  ) : null}
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+                  <TouchableOpacity style={s.acceptBtn} onPress={() => acceptOrder(o.id)}>
+                    <Text style={s.acceptBtnTxt}>Қабылдау</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+      </ScrollView>
+    </>
   );
 }
 
 const s = StyleSheet.create({
-  screen:  { flex: 1, backgroundColor: '#F3F4F6' },
-  center:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  screen: { flex: 1, backgroundColor: '#F3F4F6' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  /* ── MODAL START WORK ── */
-  overlay:      { flex: 1, justifyContent: 'flex-end' },
-  overlayBg:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  startSheet:   {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 28, paddingTop: 8,
+  /* ── MODAL ── */
+  overlay:   { flex: 1, justifyContent: 'flex-end' },
+  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    paddingHorizontal: 24, paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 32,
   },
-  sheetHandle:  { width: 44, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 20 },
-  sheetTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-  sheetIconWrap:{ width: 56, height: 56, borderRadius: 18, backgroundColor: '#FFF3EF', alignItems: 'center', justifyContent: 'center' },
-  sheetTitle:   { fontSize: 22, fontWeight: '900', color: '#1a1a2e' },
-  sheetSub:     { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
-
-  featureRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  featureBadge: { backgroundColor: '#ECFDF5', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  featureTxt:   { fontSize: 12, fontWeight: '700', color: '#059669' },
-
-  seatsLabel:   { fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  seatsGrid:    { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  seatTile:     {
-    flex: 1, borderRadius: 16, paddingVertical: 12, alignItems: 'center',
-    backgroundColor: '#F9FAFB', borderWidth: 2, borderColor: '#E5E7EB',
+  sheetHandle: {
+    width: 48, height: 5, borderRadius: 3,
+    backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 24,
   },
-  seatTileOn:   { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
-  seatTileNum:  { fontSize: 22, fontWeight: '900', color: '#374151', marginBottom: 2 },
-  seatTileNumOn:{ color: '#fff' },
-  seatTileIcon: { fontSize: 10, marginBottom: 2 },
-  seatTileLbl:  { fontSize: 9, color: '#9CA3AF', fontWeight: '600' },
-  seatTileLblOn:{ color: 'rgba(255,255,255,0.8)' },
+  sheetTitle: { fontSize: 24, fontWeight: '900', color: '#1a1a2e', marginBottom: 4 },
+  sheetSub:   { fontSize: 14, color: '#9CA3AF', marginBottom: 24 },
 
-  goWorkBtn:    {
-    backgroundColor: '#10B981', borderRadius: 18, paddingVertical: 18,
-    alignItems: 'center', marginBottom: 10,
-    shadowColor: '#10B981', shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+  seatRow:    { flexDirection: 'row', gap: 14, marginBottom: 20 },
+  seatCard:   {
+    flex: 1, borderRadius: 22, paddingVertical: 22, alignItems: 'center',
+    backgroundColor: '#F9FAFB', borderWidth: 2.5, borderColor: '#E5E7EB',
   },
-  goWorkTxt:    { color: '#fff', fontWeight: '900', fontSize: 17, letterSpacing: 0.3 },
-  cancelWorkBtn:{ paddingVertical: 14, alignItems: 'center' },
-  cancelWorkTxt:{ color: '#9CA3AF', fontWeight: '600', fontSize: 15 },
+  seatCardOn: { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
+  seatCardEmoji: { fontSize: 32, marginBottom: 8 },
+  seatCardNum:   { fontSize: 36, fontWeight: '900', color: '#374151', lineHeight: 40 },
+  seatCardNumOn: { color: '#FF6B35' },
+  seatCardLbl:   { fontSize: 13, fontWeight: '700', color: '#9CA3AF', marginTop: 2 },
+  seatCardLblOn: { color: 'rgba(255,255,255,0.5)' },
+  seatCardSub:   { fontSize: 11, color: '#D1D5DB', marginTop: 4 },
+  seatCardSubOn: { color: 'rgba(255,255,255,0.35)' },
 
-  /* Header */
-  header:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 14, marginBottom: 2 },
-  headerLeft: { flex: 1 },
-  name:       { fontSize: 20, fontWeight: '900', color: '#1a1a2e' },
-  statusRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  statusDot:  { width: 8, height: 8, borderRadius: 4 },
-  statusTxt:  { fontSize: 13, color: '#6B7280', fontWeight: '500' },
-  statusSep:  { fontSize: 13, color: '#D1D5DB' },
-  avatarBtn:  { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center', shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
-  avatarTxt:  { color: '#fff', fontWeight: '900', fontSize: 19 },
+  includeBox: {
+    backgroundColor: '#F0FDF4', borderRadius: 16,
+    paddingVertical: 14, paddingHorizontal: 18,
+    gap: 6, marginBottom: 24,
+  },
+  includeTxt: { fontSize: 13, fontWeight: '600', color: '#059669' },
 
-  offlineBanner: { backgroundColor: '#EF4444', paddingVertical: 8, alignItems: 'center' },
-  offlineTxt:    { color: '#fff', fontWeight: '700' },
+  startBtn: {
+    backgroundColor: '#FF6B35', borderRadius: 18, paddingVertical: 18,
+    alignItems: 'center', marginBottom: 12,
+    shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
+  },
+  startBtnTxt:  { color: '#fff', fontSize: 17, fontWeight: '900' },
+  cancelBtn:    { paddingVertical: 12, alignItems: 'center' },
+  cancelBtnTxt: { color: '#9CA3AF', fontSize: 15, fontWeight: '600' },
+
+  /* ── HEADER ── */
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+  },
+  headerName:      { fontSize: 20, fontWeight: '900', color: '#1a1a2e' },
+  headerStatus:    { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
+  headerDot:       { width: 8, height: 8, borderRadius: 4 },
+  headerStatusTxt: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  headerSep:       { color: '#D1D5DB', fontSize: 13 },
+  headerRating:    { fontSize: 13, color: '#6B7280', fontWeight: '600' },
+  avatarBtn: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#FF6B35', shadowOpacity: 0.45, shadowRadius: 8, elevation: 5,
+  },
+  avatarTxt: { color: '#fff', fontWeight: '900', fontSize: 19 },
+
+  offlineBanner: { backgroundColor: '#EF4444', paddingVertical: 9, alignItems: 'center' },
+  offlineTxt:    { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  /* ── СТАТИСТИКА ── */
+  statsCard: {
+    flexDirection: 'row', backgroundColor: '#fff',
+    marginHorizontal: 16, marginTop: 14, borderRadius: 20, padding: 18,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  statItem:    { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, backgroundColor: '#F3F4F6' },
+  statNum:     { fontSize: 22, fontWeight: '900', color: '#1a1a2e', marginBottom: 3 },
+  statLbl:     { fontSize: 11, color: '#9CA3AF', fontWeight: '600' },
 
   /* ── ОНЛАЙН КАРТА ── */
-  onlineCard:  {
-    marginHorizontal: 16, marginBottom: 12, backgroundColor: '#1a1a2e',
-    borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#1a1a2e', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5,
+  onlineCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginTop: 12,
+    backgroundColor: '#1a1a2e', borderRadius: 20, padding: 18,
+    shadowColor: '#1a1a2e', shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
   },
-  onlineInfo:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  onlineDot:   { width: 12, height: 12, borderRadius: 6, backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 1, shadowRadius: 4 },
-  onlineTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  onlineSub:   { fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
-  onlineBtns:  { flexDirection: 'row', gap: 8 },
-  earningsMiniBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
-  earningsMiniBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  stopMiniBtn: { backgroundColor: '#EF4444', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
-  stopMiniBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  onlinePulse: {
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(16,185,129,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  onlinePulseInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' },
+  onlineTitle: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  onlineSub:   { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  stopBtn: {
+    backgroundColor: '#EF4444', borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  stopBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 13 },
 
   /* ── ОФЛАЙН КАРТА ── */
-  offlineCard:  {
-    marginHorizontal: 16, marginBottom: 12, backgroundColor: '#fff',
-    borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center',
+  offlineCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginTop: 12,
+    backgroundColor: '#fff', borderRadius: 20, padding: 18,
     borderWidth: 2, borderColor: '#F3F4F6',
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  offlineCardLeft:  { flex: 1 },
+  offlineCardIcon: {
+    width: 52, height: 52, borderRadius: 16,
+    backgroundColor: '#FFF3EF', alignItems: 'center', justifyContent: 'center',
+  },
   offlineCardTitle: { fontSize: 16, fontWeight: '800', color: '#1a1a2e' },
   offlineCardSub:   { fontSize: 12, color: '#9CA3AF', marginTop: 3 },
-  offlineCardBtns:  { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  earningsOutlineBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#FFF3EF', alignItems: 'center', justifyContent: 'center' },
-  earningsOutlineTxt: { fontSize: 20 },
-  startCardBtn: {
-    backgroundColor: '#10B981', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 12,
-    shadowColor: '#10B981', shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+  offlineCardArrow: {
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center',
   },
-  startCardBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  offlineCardArrowTxt: { color: '#fff', fontSize: 22, fontWeight: '300', marginTop: -2 },
 
-  /* Section */
-  sectionTitle: { fontSize: 15, fontWeight: '800', paddingHorizontal: 16, marginTop: 4, marginBottom: 8, color: '#1a1a2e' },
+  /* ── QUICK ACTIONS ── */
+  quickGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    marginHorizontal: 16, marginTop: 14, gap: 10,
+  },
+  quickTile: {
+    width: '47%', borderRadius: 18,
+    paddingVertical: 16, paddingHorizontal: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+  },
+  quickIcon:  { fontSize: 22 },
+  quickLabel: { fontSize: 14, fontWeight: '700' },
 
-  /* Жолаушы карточкасы */
+  /* ── SECTION ── */
+  section:      { marginTop: 14 },
+  sectionTitle: {
+    fontSize: 15, fontWeight: '800', color: '#1a1a2e',
+    paddingHorizontal: 16, marginBottom: 10,
+  },
+
+  /* ── ЖОЛАУШЫ КАРТОЧКА ── */
   pasCard: {
     backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10,
-    borderRadius: 16, padding: 14, elevation: 3,
+    borderRadius: 20, padding: 16, elevation: 3,
     borderLeftWidth: 4, borderLeftColor: '#10B981',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
   },
-  pasTop:    { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  pasTop:    { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  pasAvatar: {
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
+  },
   pasName:   { fontSize: 15, fontWeight: '800', color: '#1a1a2e' },
-  pasType:   { fontSize: 12, color: '#888', marginTop: 2 },
+  pasInfo:   { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
   pasPrice:  { color: '#FF6B35', fontWeight: '700' },
-  callBtn:   { width: 44, height: 44, borderRadius: 22, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' },
-  callTxt:   { fontSize: 20 },
+  callBtn:   {
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center',
+  },
 
-  routeRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  addrLine:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 2 },
-  dot:       { width: 10, height: 10, borderRadius: 5 },
-  addrTxt:   { flex: 1, fontSize: 13, color: '#374151', fontWeight: '500' },
-  navBtn:    { width: 48, height: 48, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
-  navTxt:    { fontSize: 18 },
-  navLabel:  { fontSize: 9, color: '#3B82F6', fontWeight: '700' },
+  routeBlock: { backgroundColor: '#F9FAFB', borderRadius: 14, padding: 12, marginBottom: 12, gap: 8 },
+  routeLine:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dot:        { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  routeTxt:   { flex: 1, fontSize: 13, color: '#374151', fontWeight: '500' },
+  navBtn:     {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center',
+  },
+  navTxt: { fontSize: 16 },
 
   pasBtns:   { flexDirection: 'row', gap: 8 },
-  pasBtn:    { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  chatPasBtn:{ backgroundColor: '#EFF6FF' },
-  finishPasBtn: { backgroundColor: '#ECFDF5' },
-  dropPasBtn:{ backgroundColor: '#FEF2F2' },
-  pasBtnTxt: { fontWeight: '700', fontSize: 12, color: '#1a1a2e' },
+  pasBtn:    { flex: 1, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+  pasBtnTxt: { fontSize: 13, fontWeight: '700' },
 
-  /* Тапсырыс карточкасы */
-  orderCard:  { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 16, padding: 14, elevation: 2 },
-  orderTop:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  orderType:  { fontWeight: '700', fontSize: 14, color: '#1a1a2e' },
-  orderPrice: { fontWeight: '800', fontSize: 15, color: '#FF6B35' },
-  orderComment: { color: '#9CA3AF', fontSize: 12, marginTop: 4, marginBottom: 4 },
-  acceptBtn:  { marginTop: 10, backgroundColor: '#FF6B35', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  acceptTxt:  { color: '#fff', fontWeight: '800', fontSize: 14 },
+  /* ── ТАПСЫРЫС КАРТОЧКА ── */
+  orderCard: {
+    backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 20, padding: 16, elevation: 2,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8,
+  },
+  orderTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  orderTypePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F9FAFB', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  orderTypeEmoji:{ fontSize: 16 },
+  orderTypeTxt:  { fontSize: 13, fontWeight: '700', color: '#374151' },
+  orderPrice:    { fontSize: 18, fontWeight: '900', color: '#FF6B35' },
+  orderComment:  { fontSize: 12, color: '#9CA3AF', marginTop: 4, marginBottom: 4, fontStyle: 'italic' },
+  acceptBtn: {
+    marginTop: 12, backgroundColor: '#FF6B35', borderRadius: 14,
+    paddingVertical: 14, alignItems: 'center',
+    shadowColor: '#FF6B35', shadowOpacity: 0.35, shadowRadius: 8, elevation: 4,
+  },
+  acceptBtnTxt: { color: '#fff', fontWeight: '900', fontSize: 15 },
 
-  /* Бос */
-  emptyCard:  { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16, padding: 20, alignItems: 'center' },
-  emptyTxt:   { color: '#9CA3AF', fontSize: 14 },
-
-  /* Төмен */
-  bottomRow:  { flexDirection: 'row', marginHorizontal: 16, marginTop: 16, gap: 10 },
-  bottomBtn:  { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-  bottomTxt:  { color: '#fff', fontWeight: '800', fontSize: 14 },
+  /* ── БОС КҮЙІ ── */
+  emptyBox: {
+    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 20,
+    padding: 28, alignItems: 'center',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+  },
+  emptyEmoji: { fontSize: 40, marginBottom: 10 },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151', marginBottom: 4 },
+  emptySub:   { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
 });
