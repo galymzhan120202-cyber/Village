@@ -4,6 +4,7 @@ import {
   StyleSheet, Alert, ActivityIndicator, RefreshControl,
   Linking, Vibration, Platform, Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -21,124 +22,107 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const QUICK = [
-  { key: 'Map',      icon: '🗺️', label: 'Карта',    color: '#3B82F6', bg: '#EFF6FF' },
-  { key: 'Earnings', icon: '💰', label: 'Табыс',    color: '#10B981', bg: '#ECFDF5' },
-  { key: 'History',  icon: '📋', label: 'Тарих',    color: '#8B5CF6', bg: '#F5F3FF' },
-  { key: 'Profile',  icon: '👤', label: 'Профиль', color: '#F59E0B', bg: '#FFFBEB' },
-];
-
 export default function HomeDriverScreen({ navigation }) {
-  const { user }    = useAuth();
+  const { user }      = useAuth();
   const { isOffline } = useNetwork();
 
   const [profile,      setProfile]      = useState(null);
   const [availOrders,  setAvailOrders]  = useState([]);
   const [myPassengers, setMyPassengers] = useState([]);
-  const [loading,      setLoading]      = useState(false);
+  const [loading,      setLoading]      = useState(true);
   const [refreshing,   setRefreshing]   = useState(false);
   const [unreadChats,  setUnreadChats]  = useState(new Set());
   const [showForm,     setShowForm]     = useState(false);
   const [seats,        setSeats]        = useState(4);
 
-  const locationIntervalRef = useRef(null);
-  const ordersIntervalRef   = useRef(null);
-  const prevOrderCountRef   = useRef(0);
+  const locationRef  = useRef(null);
+  const ordersRef    = useRef(null);
+  const prevCountRef = useRef(0);
 
   useEffect(() => { loadData(); loadSavedSeats(); registerPushToken(); }, []);
 
   useEffect(() => {
     if (profile?.is_online) {
-      startLocationTracking();
+      startLocTracking();
       startBackgroundLocation();
-      ordersIntervalRef.current = setInterval(loadAvailableOrders, 20000);
+      ordersRef.current = setInterval(loadOrders, 20000);
     } else {
-      stopLocationTracking();
+      stopLocTracking();
       stopBackgroundLocation();
-      if (ordersIntervalRef.current) {
-        clearInterval(ordersIntervalRef.current);
-        ordersIntervalRef.current = null;
-      }
+      if (ordersRef.current) { clearInterval(ordersRef.current); ordersRef.current = null; }
     }
     return () => {
-      stopLocationTracking();
+      stopLocTracking();
       stopBackgroundLocation();
-      if (ordersIntervalRef.current) clearInterval(ordersIntervalRef.current);
+      if (ordersRef.current) clearInterval(ordersRef.current);
     };
   }, [profile?.is_online]);
 
   async function registerPushToken() {
     try {
       if (!Device.isDevice) return;
-      const { status: existing } = await Notifications.getPermissionsAsync();
-      let finalStatus = existing;
-      if (existing !== 'granted') {
+      const { status: ex } = await Notifications.getPermissionsAsync();
+      let fs = ex;
+      if (ex !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
+        fs = status;
       }
-      if (finalStatus !== 'granted') return;
-      const tokenData = await Notifications.getExpoPushTokenAsync();
-      await driverAPI.savePushToken(tokenData.data);
+      if (fs !== 'granted') return;
+      const t = await Notifications.getExpoPushTokenAsync();
+      await driverAPI.savePushToken(t.data);
     } catch (_) {}
   }
 
   async function loadSavedSeats() {
     try {
-      const raw = await AsyncStorage.getItem('driver_seats');
-      if (raw) setSeats(parseInt(raw) || 4);
+      const r = await AsyncStorage.getItem('driver_seats');
+      if (r) setSeats(parseInt(r) || 4);
     } catch (_) {}
   }
 
-  async function startLocationTracking() {
+  async function startLocTracking() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return;
-    sendLocation();
-    locationIntervalRef.current = setInterval(sendLocation, 30000);
+    sendLoc();
+    locationRef.current = setInterval(sendLoc, 30000);
   }
 
-  function stopLocationTracking() {
-    if (locationIntervalRef.current) {
-      clearInterval(locationIntervalRef.current);
-      locationIntervalRef.current = null;
-    }
+  function stopLocTracking() {
+    if (locationRef.current) { clearInterval(locationRef.current); locationRef.current = null; }
   }
 
-  async function sendLocation() {
+  async function sendLoc() {
     try {
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      await driverAPI.updateLocation(loc.coords.latitude, loc.coords.longitude);
+      const l = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      await driverAPI.updateLocation(l.coords.latitude, l.coords.longitude);
     } catch (_) {}
   }
 
-  async function loadAvailableOrders() {
+  async function loadOrders() {
     try {
       const res = await ordersAPI.available();
-      const newOrders = res.data;
-      if (newOrders.length > prevOrderCountRef.current) Vibration.vibrate([0, 200, 100, 200]);
-      prevOrderCountRef.current = newOrders.length;
-      setAvailOrders(newOrders);
+      if (res.data.length > prevCountRef.current) Vibration.vibrate([0, 200, 100, 200]);
+      prevCountRef.current = res.data.length;
+      setAvailOrders(res.data);
     } catch (_) {}
   }
 
   async function loadData() {
-    setLoading(true);
     try {
-      const [profRes, passRes] = await Promise.all([driverAPI.profile(), driverAPI.passengers()]);
-      setProfile(profRes.data);
-      setMyPassengers(passRes.data);
-
+      const [pR, passR] = await Promise.all([driverAPI.profile(), driverAPI.passengers()]);
+      setProfile(pR.data);
+      setMyPassengers(passR.data);
       const unread = new Set();
-      await Promise.all(passRes.data.map(async (p) => {
+      await Promise.all(passR.data.map(async (p) => {
         if (!p.msg_count) return;
-        const stored = await AsyncStorage.getItem(`chat_read_${p.id}`);
-        if (p.msg_count > parseInt(stored || '0', 10)) unread.add(p.id);
+        const s = await AsyncStorage.getItem(`chat_read_${p.id}`);
+        if (p.msg_count > parseInt(s || '0', 10)) unread.add(p.id);
       }));
       setUnreadChats(unread);
-
-      if (profRes.data.is_online) {
-        const ordRes = await ordersAPI.available();
-        prevOrderCountRef.current = ordRes.data.length;
-        setAvailOrders(ordRes.data);
+      if (pR.data.is_online) {
+        const oR = await ordersAPI.available();
+        prevCountRef.current = oR.data.length;
+        setAvailOrders(oR.data);
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
@@ -151,14 +135,14 @@ export default function HomeDriverScreen({ navigation }) {
       setShowForm(false);
       loadData();
     } catch (e) {
-      Alert.alert('Қате', e.response?.data?.detail || 'Қате');
+      Alert.alert('Қате', e.response?.data?.detail || 'Қате болды');
     }
   }
 
   async function stopWork() {
     Alert.alert('Жұмысты тоқтату', 'Тапсырыс қабылдауды тоқтатасыз ба?', [
       { text: 'Жоқ' },
-      { text: 'Иә, тоқтату', style: 'destructive', onPress: async () => { await driverAPI.stopWork(); loadData(); } },
+      { text: 'Иә', style: 'destructive', onPress: async () => { await driverAPI.stopWork(); loadData(); } },
     ]);
   }
 
@@ -167,19 +151,15 @@ export default function HomeDriverScreen({ navigation }) {
       const res = await ordersAPI.accept(id);
       Alert.alert('✅ Қабылданды', `${res.data.price} тг`);
       loadData();
-    } catch (e) {
-      Alert.alert('Қате', e.response?.data?.detail || 'Қате');
-    }
+    } catch (e) { Alert.alert('Қате', e.response?.data?.detail || 'Қате'); }
   }
 
   async function finishOrder(id) {
-    Alert.alert('Растау', 'Жолаушыны түсірдіңіз бе?', [
+    Alert.alert('Жолаушыны түсірдіңіз бе?', '', [
       { text: 'Жоқ' },
       { text: 'Иә, аяқтау', onPress: async () => {
-        try {
-          await ordersAPI.finish(id);
-          loadData();
-        } catch (e) { Alert.alert('Қате', e.response?.data?.detail || 'Қате'); }
+        try { await ordersAPI.finish(id); loadData(); }
+        catch (e) { Alert.alert('Қате', e.response?.data?.detail || 'Қате'); }
       }},
     ]);
   }
@@ -194,123 +174,125 @@ export default function HomeDriverScreen({ navigation }) {
     ]);
   }
 
-  function openMaps(address) {
-    const q = encodeURIComponent(address);
+  function openMaps(addr) {
+    const q = encodeURIComponent(addr);
     const url = Platform.OS === 'ios' ? `maps://?q=${q}` : `geo:0,0?q=${q}`;
     Linking.openURL(url).catch(() =>
       Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`)
     );
   }
 
-  if (loading && !profile) {
+  if (loading) {
     return (
-      <View style={s.center}>
-        <ActivityIndicator size="large" color="#FF6B35" />
-      </View>
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}><ActivityIndicator size="large" color="#FF6B35" /></View>
+      </SafeAreaView>
     );
   }
 
   const isOnline = !!profile?.is_online;
 
   return (
-    <>
+    <SafeAreaView style={s.safe} edges={['top']}>
+
       {/* ── ЖҰМЫСҚА ШЫҒУ МОДАЛЫ ── */}
       <Modal visible={showForm} transparent animationType="slide" onRequestClose={() => setShowForm(false)}>
-        <View style={s.overlay}>
-          <TouchableOpacity style={s.overlayBg} activeOpacity={1} onPress={() => setShowForm(false)} />
-          <View style={s.sheet}>
-            <View style={s.sheetHandle} />
+        <View style={m.overlay}>
+          <TouchableOpacity style={m.bg} activeOpacity={1} onPress={() => setShowForm(false)} />
+          <View style={m.sheet}>
+            <View style={m.handle} />
+            <Text style={m.title}>Жұмысқа шығу</Text>
+            <Text style={m.sub}>Машинаңыздың орын санын таңдаңыз</Text>
 
-            <Text style={s.sheetTitle}>🚗  Жұмысқа шығу</Text>
-            <Text style={s.sheetSub}>Машинаңыздың орын санын таңдаңыз</Text>
-
-            {/* Тек 4 немесе 6 */}
-            <View style={s.seatRow}>
-              <TouchableOpacity
-                style={[s.seatCard, seats === 4 && s.seatCardOn]}
-                onPress={() => setSeats(4)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.seatCardEmoji}>🚗</Text>
-                <Text style={[s.seatCardNum, seats === 4 && s.seatCardNumOn]}>4</Text>
-                <Text style={[s.seatCardLbl, seats === 4 && s.seatCardLblOn]}>орын</Text>
-                <Text style={[s.seatCardSub, seats === 4 && s.seatCardSubOn]}>Жеңіл авто</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[s.seatCard, seats === 6 && s.seatCardOn]}
-                onPress={() => setSeats(6)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.seatCardEmoji}>🚐</Text>
-                <Text style={[s.seatCardNum, seats === 6 && s.seatCardNumOn]}>6</Text>
-                <Text style={[s.seatCardLbl, seats === 6 && s.seatCardLblOn]}>орын</Text>
-                <Text style={[s.seatCardSub, seats === 6 && s.seatCardSubOn]}>Микроавтобус</Text>
-              </TouchableOpacity>
+            <View style={m.seatRow}>
+              {[
+                { n: 4, emoji: '🚗', lbl: 'Жеңіл авто' },
+                { n: 6, emoji: '🚐', lbl: 'Микроавтобус' },
+              ].map(({ n, emoji, lbl }) => (
+                <TouchableOpacity
+                  key={n}
+                  style={[m.seatCard, seats === n && m.seatCardOn]}
+                  onPress={() => setSeats(n)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={m.seatEmoji}>{emoji}</Text>
+                  <Text style={[m.seatNum, seats === n && m.seatNumOn]}>{n}</Text>
+                  <Text style={[m.seatUnit, seats === n && m.seatUnitOn]}>орын</Text>
+                  <Text style={[m.seatLbl, seats === n && m.seatLblOn]}>{lbl}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* Қосылатындар */}
-            <View style={s.includeBox}>
-              <Text style={s.includeTxt}>✓  Барлық маршруттар</Text>
-              <Text style={s.includeTxt}>✓  Барлық ауылдар</Text>
-              <Text style={s.includeTxt}>✓  Сәлемдеме жеткізу</Text>
+            <View style={m.infoBox}>
+              {['Барлық маршруттар', 'Барлық ауылдар', 'Сәлемдеме жеткізу'].map(t => (
+                <View key={t} style={m.infoRow}>
+                  <View style={m.infoDot} />
+                  <Text style={m.infoTxt}>{t}</Text>
+                </View>
+              ))}
             </View>
 
-            <TouchableOpacity style={s.startBtn} onPress={startWork}>
-              <Text style={s.startBtnTxt}>🚀  Жұмысты бастау</Text>
+            <TouchableOpacity style={m.goBtn} onPress={startWork}>
+              <Text style={m.goBtnTxt}>Жұмысты бастау →</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => setShowForm(false)}>
-              <Text style={s.cancelBtnTxt}>Болдырмау</Text>
+            <TouchableOpacity onPress={() => setShowForm(false)} style={m.cancelBtn}>
+              <Text style={m.cancelTxt}>Болдырмау</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
+      {/* ── HEADER ── */}
+      <View style={s.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.hName} numberOfLines={1}>{user?.name}</Text>
+          <View style={s.hRow}>
+            <View style={[s.hDot, { backgroundColor: isOnline ? '#10B981' : '#9CA3AF' }]} />
+            <Text style={s.hStatus}>{isOnline ? 'Жұмыста' : 'Оффлайн'}</Text>
+            <Text style={s.hSep}>·</Text>
+            <Text style={s.hRating}>⭐ {profile?.rating ?? '5.0'}</Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={s.avatar}>
+          <Text style={s.avatarTxt}>{(user?.name || 'D')[0].toUpperCase()}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {isOffline && (
+        <View style={s.offlineBanner}>
+          <Text style={s.offlineTxt}>📵 Интернет байланысы жоқ</Text>
+        </View>
+      )}
+
       <ScrollView
-        style={s.screen}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#FF6B35" />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadData(); }}
+            tintColor="#FF6B35"
+          />
         }
       >
-        {/* ── HEADER ── */}
-        <View style={s.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.headerName}>{user?.name}</Text>
-            <View style={s.headerStatus}>
-              <View style={[s.headerDot, { backgroundColor: isOnline ? '#10B981' : '#9CA3AF' }]} />
-              <Text style={s.headerStatusTxt}>
-                {isOnline ? 'Жұмыста' : 'Оффлайн'}
-              </Text>
-              <Text style={s.headerSep}>·</Text>
-              <Text style={s.headerRating}>⭐ {profile?.rating ?? '5.0'}</Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={s.avatarBtn}>
-            <Text style={s.avatarTxt}>{(user?.name || 'D')[0].toUpperCase()}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {isOffline && (
-          <View style={s.offlineBanner}>
-            <Text style={s.offlineTxt}>📵 Интернет байланысы жоқ</Text>
-          </View>
-        )}
-
-        {/* ── АПТАЛЫҚ СТАТИСТИКА ── */}
-        <View style={s.statsCard}>
-          <View style={s.statItem}>
+        {/* ── СТАТИСТИКА ── */}
+        <View style={s.statsRow}>
+          <View style={s.statBox}>
             <Text style={s.statNum}>{profile?.weekly_completed ?? 0}</Text>
             <Text style={s.statLbl}>Тапсырыс</Text>
           </View>
           <View style={s.statDivider} />
-          <View style={s.statItem}>
-            <Text style={[s.statNum, { color: '#10B981' }]}>{profile?.weekly_income ?? 0} ₸</Text>
-            <Text style={s.statLbl}>Апталық</Text>
+          <View style={s.statBox}>
+            <Text style={[s.statNum, { color: '#10B981' }]}>
+              {profile?.weekly_income ?? 0}
+            </Text>
+            <Text style={s.statLbl}>Табыс (тг)</Text>
           </View>
           <View style={s.statDivider} />
-          <View style={s.statItem}>
-            <Text style={[s.statNum, { color: '#F59E0B' }]}>{profile?.rating ?? '5.0'}</Text>
+          <View style={s.statBox}>
+            <Text style={[s.statNum, { color: '#F59E0B' }]}>
+              {profile?.rating ?? '5.0'}
+            </Text>
             <Text style={s.statLbl}>Рейтинг</Text>
           </View>
         </View>
@@ -318,82 +300,94 @@ export default function HomeDriverScreen({ navigation }) {
         {/* ── ЖҰМЫС КҮЙІ ── */}
         {isOnline ? (
           <View style={s.onlineCard}>
-            <View style={s.onlinePulse}>
-              <View style={s.onlinePulseInner} />
+            <View style={s.pulse}>
+              <View style={s.pulseCore} />
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={s.onlineTitle}>Жұмыста</Text>
-              <Text style={s.onlineSub}>{profile?.current_seats ?? seats} орын · Тапсырыс күтілуде</Text>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={s.onlineTitle}>Жұмыста 🟢</Text>
+              <Text style={s.onlineSub}>
+                {profile?.current_seats ?? seats} орын · Тапсырыс күтілуде
+              </Text>
             </View>
             <TouchableOpacity style={s.stopBtn} onPress={stopWork}>
               <Text style={s.stopBtnTxt}>Тоқтату</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={s.offlineCard} onPress={() => setShowForm(true)} activeOpacity={0.85}>
-            <View style={s.offlineCardIcon}>
-              <Text style={{ fontSize: 26 }}>🚗</Text>
+          <TouchableOpacity style={s.startCard} onPress={() => setShowForm(true)} activeOpacity={0.9}>
+            <View style={s.startCardIcon}>
+              <Text style={{ fontSize: 28 }}>🚗</Text>
             </View>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={s.offlineCardTitle}>Жұмысқа шығу</Text>
-              <Text style={s.offlineCardSub}>Тапсырыс қабылдауды бастаңыз</Text>
+              <Text style={s.startCardTitle}>Жұмысқа шығу</Text>
+              <Text style={s.startCardSub}>Тапсырыс қабылдауды бастаңыз</Text>
             </View>
-            <View style={s.offlineCardArrow}>
-              <Text style={s.offlineCardArrowTxt}>›</Text>
+            <View style={s.startCardArrow}>
+              <Text style={s.startCardArrowTxt}>›</Text>
             </View>
           </TouchableOpacity>
         )}
 
         {/* ── QUICK ACTIONS ── */}
         <View style={s.quickGrid}>
-          {QUICK.map((q) => (
-            <TouchableOpacity
-              key={q.key}
-              style={[s.quickTile, { backgroundColor: q.bg }]}
-              onPress={() => navigation.navigate(q.key)}
-              activeOpacity={0.75}
-            >
-              <Text style={s.quickIcon}>{q.icon}</Text>
-              <Text style={[s.quickLabel, { color: q.color }]}>{q.label}</Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity style={[s.quickTile, { backgroundColor: '#EFF6FF' }]}
+            onPress={() => navigation.navigate('Map')}>
+            <Text style={s.quickEmoji}>🗺️</Text>
+            <Text style={[s.quickLabel, { color: '#2563EB' }]}>Карта</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[s.quickTile, { backgroundColor: '#ECFDF5' }]}
+            onPress={() => navigation.navigate('Earnings')}>
+            <Text style={s.quickEmoji}>💰</Text>
+            <Text style={[s.quickLabel, { color: '#059669' }]}>Табыс</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[s.quickTile, { backgroundColor: '#F5F3FF' }]}
+            onPress={() => navigation.navigate('History')}>
+            <Text style={s.quickEmoji}>📋</Text>
+            <Text style={[s.quickLabel, { color: '#7C3AED' }]}>Тарих</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[s.quickTile, { backgroundColor: '#FFF7ED' }]}
+            onPress={() => navigation.navigate('Profile')}>
+            <Text style={s.quickEmoji}>👤</Text>
+            <Text style={[s.quickLabel, { color: '#D97706' }]}>Профиль</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── ЖОЛАУШЫЛАР ── */}
         {myPassengers.length > 0 && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>👥 Жолаушыларым</Text>
+          <>
+            <Text style={s.sectionTitle}>👥 Жолаушыларым ({myPassengers.length})</Text>
             {myPassengers.map((p) => {
               const from = p.landmark || p.village || '—';
               const to   = p.to_loc || '—';
               return (
                 <View key={p.id} style={s.pasCard}>
-                  <View style={s.pasTop}>
-                    <View style={s.pasAvatar}>
-                      <Text style={{ fontSize: 20 }}>👤</Text>
+                  <View style={s.pasHead}>
+                    <View style={s.pasAv}>
+                      <Text style={{ fontSize: 22 }}>👤</Text>
                     </View>
-                    <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={s.pasName}>{p.passenger_name}</Text>
-                      <Text style={s.pasInfo}>
+                      <Text style={s.pasType}>
                         {p.order_type === 'delivery' ? '📦 Сәлемдеме' : '🚖 Такси'}
-                        {'  '}
-                        <Text style={s.pasPrice}>{p.price} ₸</Text>
+                        {'  ·  '}
+                        <Text style={{ color: '#FF6B35', fontWeight: '700' }}>{p.price} тг</Text>
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      style={s.callBtn}
-                      onPress={() => Linking.openURL(`tel:${p.passenger_phone}`)}
-                    >
+                    <TouchableOpacity style={s.callBtn}
+                      onPress={() => Linking.openURL(`tel:${p.passenger_phone}`)}>
                       <Text style={{ fontSize: 20 }}>📞</Text>
                     </TouchableOpacity>
                   </View>
 
-                  <View style={s.routeBlock}>
+                  <View style={s.routeWrap}>
                     <View style={s.routeLine}>
                       <View style={[s.dot, { backgroundColor: '#10B981' }]} />
                       <Text style={s.routeTxt} numberOfLines={1}>{from}</Text>
-                      <TouchableOpacity style={s.navBtn} onPress={() => openMaps(from)}>
-                        <Text style={s.navTxt}>🗺️</Text>
+                      <TouchableOpacity style={s.mapBtn} onPress={() => openMaps(from)}>
+                        <Text>🗺️</Text>
                       </TouchableOpacity>
                     </View>
                     <View style={s.routeLine}>
@@ -403,64 +397,61 @@ export default function HomeDriverScreen({ navigation }) {
                   </View>
 
                   <View style={s.pasBtns}>
-                    <TouchableOpacity
-                      style={[s.pasBtn, { backgroundColor: '#EFF6FF' }]}
+                    <TouchableOpacity style={[s.pasBtn, { backgroundColor: '#EFF6FF' }]}
                       onPress={() => {
-                        setUnreadChats(prev => { const n = new Set(prev); n.delete(p.id); return n; });
+                        setUnreadChats(pr => { const n = new Set(pr); n.delete(p.id); return n; });
                         navigation.navigate('Chat', { orderId: p.id, otherName: p.passenger_name });
-                      }}
-                    >
-                      <Text style={[s.pasBtnTxt, { color: '#3B82F6' }]}>
+                      }}>
+                      <Text style={[s.pasBtnTxt, { color: '#2563EB' }]}>
                         💬 Чат{unreadChats.has(p.id) ? ' 🔴' : ''}
                       </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[s.pasBtn, { backgroundColor: '#ECFDF5' }]}
-                      onPress={() => finishOrder(p.id)}
-                    >
+                    <TouchableOpacity style={[s.pasBtn, { backgroundColor: '#ECFDF5' }]}
+                      onPress={() => finishOrder(p.id)}>
                       <Text style={[s.pasBtnTxt, { color: '#059669' }]}>✅ Түсірдім</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[s.pasBtn, { backgroundColor: '#FEF2F2', flex: 0, paddingHorizontal: 14 }]}
-                      onPress={() => dropOrder(p.id)}
-                    >
-                      <Text style={{ fontSize: 16 }}>✕</Text>
+                      style={[s.pasBtn, { backgroundColor: '#FEF2F2', flex: 0, paddingHorizontal: 16 }]}
+                      onPress={() => dropOrder(p.id)}>
+                      <Text style={s.pasBtnTxt}>✕</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               );
             })}
-          </View>
+          </>
         )}
 
         {/* ── ТАПСЫРЫСТАР ── */}
         {isOnline && (
-          <View style={s.section}>
+          <>
             <Text style={s.sectionTitle}>
               📥 Тапсырыстар{availOrders.length > 0 ? ` (${availOrders.length})` : ''}
             </Text>
             {availOrders.length === 0 ? (
               <View style={s.emptyBox}>
                 <Text style={s.emptyEmoji}>🔍</Text>
-                <Text style={s.emptyTitle}>Тапсырыс күтілуде</Text>
-                <Text style={s.emptySub}>Жаңа тапсырыс келгенде вибрация береді</Text>
+                <Text style={s.emptyTitle}>Тапсырыс жоқ</Text>
+                <Text style={s.emptySub}>
+                  Жаңа тапсырыс келгенде{'\n'}телефон вибрация береді
+                </Text>
               </View>
             ) : (
               availOrders.map((o) => (
                 <View key={o.id} style={s.orderCard}>
-                  <View style={s.orderTop}>
+                  <View style={s.orderHead}>
                     <View style={s.orderTypePill}>
-                      <Text style={s.orderTypeEmoji}>
+                      <Text style={{ fontSize: 15 }}>
                         {o.order_type === 'delivery' ? '📦' : '🚖'}
                       </Text>
                       <Text style={s.orderTypeTxt}>
                         {o.order_type === 'delivery' ? 'Сәлемдеме' : `Такси · ${o.seats} орын`}
                       </Text>
                     </View>
-                    <Text style={s.orderPrice}>{o.price} ₸</Text>
+                    <Text style={s.orderPrice}>{o.price} тг</Text>
                   </View>
 
-                  <View style={s.routeBlock}>
+                  <View style={s.routeWrap}>
                     <View style={s.routeLine}>
                       <View style={[s.dot, { backgroundColor: '#10B981' }]} />
                       <Text style={s.routeTxt} numberOfLines={1}>{o.from}</Text>
@@ -481,205 +472,134 @@ export default function HomeDriverScreen({ navigation }) {
                 </View>
               ))
             )}
-          </View>
+          </>
         )}
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
+/* ─────────────────── STYLES ─────────────────── */
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F3F4F6' },
+  safe:   { flex: 1, backgroundColor: '#F3F4F6' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  /* ── MODAL ── */
-  overlay:   { flex: 1, justifyContent: 'flex-end' },
-  overlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    paddingHorizontal: 24, paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 32,
-  },
-  sheetHandle: {
-    width: 48, height: 5, borderRadius: 3,
-    backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 24,
-  },
-  sheetTitle: { fontSize: 24, fontWeight: '900', color: '#1a1a2e', marginBottom: 4 },
-  sheetSub:   { fontSize: 14, color: '#9CA3AF', marginBottom: 24 },
-
-  seatRow:    { flexDirection: 'row', gap: 14, marginBottom: 20 },
-  seatCard:   {
-    flex: 1, borderRadius: 22, paddingVertical: 22, alignItems: 'center',
-    backgroundColor: '#F9FAFB', borderWidth: 2.5, borderColor: '#E5E7EB',
-  },
-  seatCardOn: { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
-  seatCardEmoji: { fontSize: 32, marginBottom: 8 },
-  seatCardNum:   { fontSize: 36, fontWeight: '900', color: '#374151', lineHeight: 40 },
-  seatCardNumOn: { color: '#FF6B35' },
-  seatCardLbl:   { fontSize: 13, fontWeight: '700', color: '#9CA3AF', marginTop: 2 },
-  seatCardLblOn: { color: 'rgba(255,255,255,0.5)' },
-  seatCardSub:   { fontSize: 11, color: '#D1D5DB', marginTop: 4 },
-  seatCardSubOn: { color: 'rgba(255,255,255,0.35)' },
-
-  includeBox: {
-    backgroundColor: '#F0FDF4', borderRadius: 16,
-    paddingVertical: 14, paddingHorizontal: 18,
-    gap: 6, marginBottom: 24,
-  },
-  includeTxt: { fontSize: 13, fontWeight: '600', color: '#059669' },
-
-  startBtn: {
-    backgroundColor: '#FF6B35', borderRadius: 18, paddingVertical: 18,
-    alignItems: 'center', marginBottom: 12,
-    shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
-  },
-  startBtnTxt:  { color: '#fff', fontSize: 17, fontWeight: '900' },
-  cancelBtn:    { paddingVertical: 12, alignItems: 'center' },
-  cancelBtnTxt: { color: '#9CA3AF', fontSize: 15, fontWeight: '600' },
-
-  /* ── HEADER ── */
+  /* Header */
   header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20, paddingVertical: 16,
     flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14,
     borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  headerName:      { fontSize: 20, fontWeight: '900', color: '#1a1a2e' },
-  headerStatus:    { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
-  headerDot:       { width: 8, height: 8, borderRadius: 4 },
-  headerStatusTxt: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
-  headerSep:       { color: '#D1D5DB', fontSize: 13 },
-  headerRating:    { fontSize: 13, color: '#6B7280', fontWeight: '600' },
-  avatarBtn: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#FF6B35', shadowOpacity: 0.45, shadowRadius: 8, elevation: 5,
+  hName:   { fontSize: 20, fontWeight: '900', color: '#1a1a2e' },
+  hRow:    { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
+  hDot:    { width: 8, height: 8, borderRadius: 4 },
+  hStatus: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  hSep:    { color: '#D1D5DB' },
+  hRating: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
+  avatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#FF6B35',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 8, elevation: 5,
   },
-  avatarTxt: { color: '#fff', fontWeight: '900', fontSize: 19 },
+  avatarTxt: { color: '#fff', fontWeight: '900', fontSize: 18 },
 
-  offlineBanner: { backgroundColor: '#EF4444', paddingVertical: 9, alignItems: 'center' },
+  offlineBanner: { backgroundColor: '#EF4444', paddingVertical: 8, alignItems: 'center' },
   offlineTxt:    { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  /* ── СТАТИСТИКА ── */
-  statsCard: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    marginHorizontal: 16, marginTop: 14, borderRadius: 20, padding: 18,
+  /* Stats */
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 16, marginTop: 14,
+    borderRadius: 20, paddingVertical: 18,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  statItem:    { flex: 1, alignItems: 'center' },
+  statBox:     { flex: 1, alignItems: 'center' },
   statDivider: { width: 1, backgroundColor: '#F3F4F6' },
-  statNum:     { fontSize: 22, fontWeight: '900', color: '#1a1a2e', marginBottom: 3 },
+  statNum:     { fontSize: 24, fontWeight: '900', color: '#1a1a2e', marginBottom: 4 },
   statLbl:     { fontSize: 11, color: '#9CA3AF', fontWeight: '600' },
 
-  /* ── ОНЛАЙН КАРТА ── */
+  /* Online card */
   onlineCard: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: 16, marginTop: 12,
     backgroundColor: '#1a1a2e', borderRadius: 20, padding: 18,
-    shadowColor: '#1a1a2e', shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, elevation: 6,
   },
-  onlinePulse: {
-    width: 20, height: 20, borderRadius: 10,
-    backgroundColor: 'rgba(16,185,129,0.25)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  onlinePulseInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' },
-  onlineTitle: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  onlineSub:   { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
-  stopBtn: {
-    backgroundColor: '#EF4444', borderRadius: 14,
-    paddingHorizontal: 16, paddingVertical: 10,
-  },
+  pulse:     { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(16,185,129,0.25)', alignItems: 'center', justifyContent: 'center' },
+  pulseCore: { width: 11, height: 11, borderRadius: 6, backgroundColor: '#10B981' },
+  onlineTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  onlineSub:   { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 3 },
+  stopBtn:    { backgroundColor: '#EF4444', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10 },
   stopBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 13 },
 
-  /* ── ОФЛАЙН КАРТА ── */
-  offlineCard: {
+  /* Start card */
+  startCard: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: 16, marginTop: 12,
     backgroundColor: '#fff', borderRadius: 20, padding: 18,
     borderWidth: 2, borderColor: '#F3F4F6',
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
   },
-  offlineCardIcon: {
-    width: 52, height: 52, borderRadius: 16,
-    backgroundColor: '#FFF3EF', alignItems: 'center', justifyContent: 'center',
-  },
-  offlineCardTitle: { fontSize: 16, fontWeight: '800', color: '#1a1a2e' },
-  offlineCardSub:   { fontSize: 12, color: '#9CA3AF', marginTop: 3 },
-  offlineCardArrow: {
-    width: 36, height: 36, borderRadius: 12,
-    backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center',
-  },
-  offlineCardArrowTxt: { color: '#fff', fontSize: 22, fontWeight: '300', marginTop: -2 },
+  startCardIcon:     { width: 52, height: 52, borderRadius: 16, backgroundColor: '#FFF3EF', alignItems: 'center', justifyContent: 'center' },
+  startCardTitle:    { fontSize: 16, fontWeight: '800', color: '#1a1a2e' },
+  startCardSub:      { fontSize: 12, color: '#9CA3AF', marginTop: 3 },
+  startCardArrow:    { width: 38, height: 38, borderRadius: 12, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center' },
+  startCardArrowTxt: { color: '#fff', fontSize: 24, lineHeight: 30 },
 
-  /* ── QUICK ACTIONS ── */
+  /* Quick grid */
   quickGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
     marginHorizontal: 16, marginTop: 14, gap: 10,
   },
   quickTile: {
-    width: '47%', borderRadius: 18,
-    paddingVertical: 16, paddingHorizontal: 14,
+    width: '47.5%', borderRadius: 18,
+    paddingVertical: 18, paddingHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', gap: 10,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
-  quickIcon:  { fontSize: 22 },
-  quickLabel: { fontSize: 14, fontWeight: '700' },
+  quickEmoji: { fontSize: 24 },
+  quickLabel: { fontSize: 15, fontWeight: '800' },
 
-  /* ── SECTION ── */
-  section:      { marginTop: 14 },
-  sectionTitle: {
-    fontSize: 15, fontWeight: '800', color: '#1a1a2e',
-    paddingHorizontal: 16, marginBottom: 10,
-  },
+  /* Section */
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#1a1a2e', paddingHorizontal: 16, marginTop: 18, marginBottom: 10 },
 
-  /* ── ЖОЛАУШЫ КАРТОЧКА ── */
+  /* Passenger card */
   pasCard: {
     backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10,
     borderRadius: 20, padding: 16, elevation: 3,
     borderLeftWidth: 4, borderLeftColor: '#10B981',
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
   },
-  pasTop:    { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  pasAvatar: {
-    width: 44, height: 44, borderRadius: 14,
-    backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
-  },
-  pasName:   { fontSize: 15, fontWeight: '800', color: '#1a1a2e' },
-  pasInfo:   { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
-  pasPrice:  { color: '#FF6B35', fontWeight: '700' },
-  callBtn:   {
-    width: 44, height: 44, borderRadius: 14,
-    backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center',
-  },
+  pasHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  pasAv:   { width: 44, height: 44, borderRadius: 14, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  pasName: { fontSize: 15, fontWeight: '800', color: '#1a1a2e' },
+  pasType: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  callBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' },
 
-  routeBlock: { backgroundColor: '#F9FAFB', borderRadius: 14, padding: 12, marginBottom: 12, gap: 8 },
-  routeLine:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dot:        { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
-  routeTxt:   { flex: 1, fontSize: 13, color: '#374151', fontWeight: '500' },
-  navBtn:     {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center',
-  },
-  navTxt: { fontSize: 16 },
+  routeWrap: { backgroundColor: '#F9FAFB', borderRadius: 14, padding: 12, marginBottom: 12, gap: 8 },
+  routeLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dot:       { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  routeTxt:  { flex: 1, fontSize: 13, color: '#374151', fontWeight: '500' },
+  mapBtn:    { width: 30, height: 30, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
 
   pasBtns:   { flexDirection: 'row', gap: 8 },
   pasBtn:    { flex: 1, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  pasBtnTxt: { fontSize: 13, fontWeight: '700' },
+  pasBtnTxt: { fontSize: 13, fontWeight: '700', color: '#374151' },
 
-  /* ── ТАПСЫРЫС КАРТОЧКА ── */
+  /* Order card */
   orderCard: {
     backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10,
     borderRadius: 20, padding: 16, elevation: 2,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8,
   },
-  orderTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  orderTypePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F9FAFB', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  orderTypeEmoji:{ fontSize: 16 },
+  orderHead:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  orderTypePill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F9FAFB', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   orderTypeTxt:  { fontSize: 13, fontWeight: '700', color: '#374151' },
-  orderPrice:    { fontSize: 18, fontWeight: '900', color: '#FF6B35' },
-  orderComment:  { fontSize: 12, color: '#9CA3AF', marginTop: 4, marginBottom: 4, fontStyle: 'italic' },
+  orderPrice:    { fontSize: 20, fontWeight: '900', color: '#FF6B35' },
+  orderComment:  { fontSize: 12, color: '#9CA3AF', marginTop: 6, fontStyle: 'italic' },
   acceptBtn: {
     marginTop: 12, backgroundColor: '#FF6B35', borderRadius: 14,
     paddingVertical: 14, alignItems: 'center',
@@ -687,13 +607,48 @@ const s = StyleSheet.create({
   },
   acceptBtnTxt: { color: '#fff', fontWeight: '900', fontSize: 15 },
 
-  /* ── БОС КҮЙІ ── */
-  emptyBox: {
-    backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 20,
-    padding: 28, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+  /* Empty */
+  emptyBox:   { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 20, padding: 32, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  emptyEmoji: { fontSize: 44, marginBottom: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151', marginBottom: 6 },
+  emptySub:   { fontSize: 13, color: '#9CA3AF', textAlign: 'center', lineHeight: 20 },
+});
+
+/* ─── MODAL STYLES ─── */
+const m = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  bg:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    paddingHorizontal: 24, paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 48 : 32,
   },
-  emptyEmoji: { fontSize: 40, marginBottom: 10 },
-  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151', marginBottom: 4 },
-  emptySub:   { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
+  handle: { width: 48, height: 5, borderRadius: 3, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 24 },
+  title:  { fontSize: 26, fontWeight: '900', color: '#1a1a2e', marginBottom: 4 },
+  sub:    { fontSize: 14, color: '#9CA3AF', marginBottom: 28 },
+
+  seatRow:    { flexDirection: 'row', gap: 16, marginBottom: 24 },
+  seatCard:   {
+    flex: 1, borderRadius: 24, paddingVertical: 26, alignItems: 'center',
+    backgroundColor: '#F9FAFB', borderWidth: 2.5, borderColor: '#E5E7EB',
+  },
+  seatCardOn: { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
+  seatEmoji:  { fontSize: 36, marginBottom: 10 },
+  seatNum:    { fontSize: 40, fontWeight: '900', color: '#1a1a2e', lineHeight: 44 },
+  seatNumOn:  { color: '#FF6B35' },
+  seatUnit:   { fontSize: 13, fontWeight: '700', color: '#9CA3AF', marginTop: 2 },
+  seatUnitOn: { color: 'rgba(255,255,255,0.45)' },
+  seatLbl:    { fontSize: 12, color: '#D1D5DB', marginTop: 6 },
+  seatLblOn:  { color: 'rgba(255,255,255,0.3)' },
+
+  infoBox: { backgroundColor: '#F0FDF4', borderRadius: 18, padding: 18, marginBottom: 24, gap: 10 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  infoDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
+  infoTxt: { fontSize: 14, fontWeight: '600', color: '#059669' },
+
+  goBtn:    { backgroundColor: '#FF6B35', borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginBottom: 12, shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 12, elevation: 6 },
+  goBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  cancelBtn:  { paddingVertical: 12, alignItems: 'center' },
+  cancelTxt:  { color: '#9CA3AF', fontSize: 15, fontWeight: '600' },
 });
