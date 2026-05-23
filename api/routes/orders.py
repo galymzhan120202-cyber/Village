@@ -23,7 +23,8 @@ from database import (
     get_matching_orders,
     save_rating,
 )
-from api.db import get_messages, send_message, get_online_driver_push_tokens, get_user_push_token
+from api.db import get_messages, send_message, get_online_driver_push_tokens, get_user_push_token, get_push_tokens_for_drivers
+from database import get_notify_drivers
 from api.services.payment import charge_commission
 from api.services.push import send_push_to_many, send_push
 
@@ -80,7 +81,9 @@ async def create_order(data: CreateOrderIn, uid: int = Depends(get_current_user_
         sch=None,
     )
 
-    tokens = get_online_driver_push_tokens()
+    # Тек сәйкес жүргізушілерге push жіберу (маршрут + орын + ауыл сүзгісі)
+    matching_driver_ids = get_notify_drivers(data.o_type, data.village, data.route, data.seats)
+    tokens = get_push_tokens_for_drivers(matching_driver_ids)
     type_label = "📦 Сәлемдеме" if data.o_type == "delivery" else "🚖 Такси"
     await send_push_to_many(
         tokens,
@@ -194,7 +197,8 @@ async def accept_order(order_id: int, uid: int = Depends(get_current_user_id)):
     if status == "ok":
         token = get_user_push_token(pid)
         if token:
-            driver_name = get_user_by_id(uid)["name"] if get_user_by_id(uid) else "Жүргізуші"
+            driver = get_user_by_id(uid)
+            driver_name = driver["name"] if driver else "Жүргізуші"
             await send_push(token, "🚖 Жүргізуші келе жатыр!", f"{driver_name} сіздің тапсырысыңызды қабылдады", {"order_id": order_id})
         return {"message": "✅ Тапсырыс қабылданды!", "price": price}
 

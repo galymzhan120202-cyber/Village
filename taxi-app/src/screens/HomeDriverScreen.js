@@ -107,17 +107,17 @@ export default function HomeDriverScreen({ navigation }) {
       if (newCount > prevCountRef.current) {
         Vibration.vibrate([0, 200, 100, 200]);
         setOrderIdx(0);
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 60, friction: 10 }).start();
-      } else if (newCount === 0 && prevCountRef.current > 0) {
-        Animated.timing(slideAnim, { toValue: 300, useNativeDriver: true, duration: 200 }).start();
       }
       prevCountRef.current = newCount;
       setAvailOrders(res.data);
     } catch (_) {}
   }
 
+  // Анимацияны тек бір жерде басқарамыз
   useEffect(() => {
     if (availOrders.length > 0) {
+      // orderIdx шекарадан шыққанда 0-ге қайтарамыз
+      if (orderIdx >= availOrders.length) setOrderIdx(0);
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 60, friction: 10 }).start();
     } else {
       Animated.timing(slideAnim, { toValue: 300, useNativeDriver: true, duration: 200 }).start();

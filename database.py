@@ -265,12 +265,13 @@ def check_active_order(pid):
 # database.py ішінен get_matching_orders функциясын тауып, мынаған ауыстырыңыз:
 
 def get_matching_orders(routes_str, villages_str, delivery, seats):
-    if not routes_str or not villages_str: return []
-    
+    if not routes_str: return []
+
     conn = get_connection(); cursor = conn.cursor()
     routes = routes_str.split(',')
-    villages = villages_str.split(',')
-    
+    all_villages = not villages_str or villages_str.strip() == 'all'
+    villages = [] if all_villages else villages_str.split(',')
+
     conds = []
     
     # --- ӨЗГЕРГЕН ЖЕР: Сәлемдеме логикасы ---
@@ -298,9 +299,9 @@ def get_matching_orders(routes_str, villages_str, delivery, seats):
     if not rc: conn.close(); return []
     conds.append("(" + " OR ".join(rc) + ")")
     
-    if villages:
-        formatted_villages = "', '".join(villages)
-        conds.append(f"village IN ('{formatted_villages}')")
+    if villages and not all_villages:
+        placeholders = ','.join('?' * len(villages))
+        conds.append(f"village IN ({placeholders})")
 
     conds.append("scheduled_time IS NULL")
     
@@ -314,11 +315,13 @@ def get_matching_orders(routes_str, villages_str, delivery, seats):
     """
     conds.append(time_limit_query)
 
-    q = f"""SELECT o.landmark, o.to_loc, o.price, o.id, o.lat, o.lon, o.route, o.seats, o.order_type, o.comment, o.village, o.scheduled_time, u.name 
-            FROM orders o LEFT JOIN users u ON o.passenger_id = u.user_id 
+    q = f"""SELECT o.landmark, o.to_loc, o.price, o.id, o.lat, o.lon, o.route, o.seats, o.order_type, o.comment, o.village, o.scheduled_time, u.name
+            FROM orders o LEFT JOIN users u ON o.passenger_id = u.user_id
             WHERE o.status='active' AND {' AND '.join(conds)}"""
-            
-    try: cursor.execute(q); res = cursor.fetchall()
+
+    # Параметрлер: villages тізімі (SQL injection-ға қарсы)
+    params = villages if (villages and not all_villages) else []
+    try: cursor.execute(q, params); res = cursor.fetchall()
     except Exception as e: print(f"Error filtering orders: {e}"); res = []
         
     conn.close(); return res

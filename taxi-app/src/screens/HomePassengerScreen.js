@@ -38,6 +38,8 @@ export default function HomePassengerScreen({ navigation }) {
   const [ratingOrder,  setRatingOrder]  = useState(null);
   const [ratingValue,  setRatingValue]  = useState(0);
   const [refreshing,   setRefreshing]   = useState(false);
+  // Пайдаланушы "Өткізу" басқан тапсырыстарды сақтаймыз → модал қайта шықпайды
+  const dismissedRatings = useRef(new Set());
 
   useEffect(() => {
     requestLoc();
@@ -107,12 +109,16 @@ export default function HomePassengerScreen({ navigation }) {
       const next = {};
       orders.forEach(o => { next[o.id] = o.status; });
 
-      orders.forEach(o => {
-        if (o.status === 'finished' && o.rating === 0 && !ratingOrder) {
-          setRatingOrder({ id: o.id, driver_name: o.driver_name });
+      // Бір рет ғана рейтинг сұраймыз (dismissed болмаса және modal ашық болмаса)
+      if (!ratingOrder) {
+        const unrated = orders.find(
+          o => o.status === 'finished' && o.rating === 0 && !dismissedRatings.current.has(o.id)
+        );
+        if (unrated) {
+          setRatingOrder({ id: unrated.id, driver_name: unrated.driver_name });
           setRatingValue(0);
         }
-      });
+      }
 
       prevRef.current = next;
 
@@ -132,6 +138,7 @@ export default function HomePassengerScreen({ navigation }) {
     try {
       await ordersAPI.rate(ratingOrder.id, stars, '');
     } catch (_) {}
+    dismissedRatings.current.add(ratingOrder.id);
     setRatingOrder(null); setRatingValue(0);
   }
 
@@ -173,7 +180,10 @@ export default function HomePassengerScreen({ navigation }) {
               ))}
             </View>
             <View style={s.ratingBtns}>
-              <TouchableOpacity style={s.skipBtn} onPress={() => { setRatingOrder(null); setRatingValue(0); }}>
+              <TouchableOpacity style={s.skipBtn} onPress={() => {
+                if (ratingOrder) dismissedRatings.current.add(ratingOrder.id);
+                setRatingOrder(null); setRatingValue(0);
+              }}>
                 <Text style={s.skipTxt}>Өткізу</Text>
               </TouchableOpacity>
               <TouchableOpacity

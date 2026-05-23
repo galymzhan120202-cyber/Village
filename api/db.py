@@ -299,6 +299,22 @@ def get_online_driver_push_tokens() -> List[str]:
     return [r[0] for r in rows if r[0]]
 
 
+def get_push_tokens_for_drivers(driver_ids: List[int]) -> List[str]:
+    """Нақты жүргізушілердің push токендерін алу"""
+    if not driver_ids:
+        return []
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ','.join('?' * len(driver_ids))
+    cursor.execute(
+        f"SELECT push_token FROM users WHERE user_id IN ({placeholders}) AND push_token IS NOT NULL",
+        driver_ids,
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [r[0] for r in rows if r[0]]
+
+
 def get_user_push_token(user_id: int) -> str:
     conn = get_connection()
     cursor = conn.cursor()
