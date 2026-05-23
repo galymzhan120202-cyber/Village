@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator, RefreshControl,
-  Linking, Vibration, Platform, Modal,
+  Linking, Vibration, Platform, Modal, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -34,9 +34,11 @@ export default function HomeDriverScreen({ navigation }) {
   const [unreadChats,  setUnreadChats]  = useState(new Set());
   const [showForm,     setShowForm]     = useState(false);
   const [seats,        setSeats]        = useState(4);
+  const [orderIdx,     setOrderIdx]     = useState(0);
 
-  const locationRef  = useRef(null);
-  const ordersRef    = useRef(null);
+  const slideAnim   = useRef(new Animated.Value(300)).current;
+  const locationRef = useRef(null);
+  const ordersRef   = useRef(null);
   const prevCountRef = useRef(0);
 
   useEffect(() => { loadData(); loadSavedSeats(); registerPushToken(); }, []);
@@ -101,11 +103,26 @@ export default function HomeDriverScreen({ navigation }) {
   async function loadOrders() {
     try {
       const res = await ordersAPI.available();
-      if (res.data.length > prevCountRef.current) Vibration.vibrate([0, 200, 100, 200]);
-      prevCountRef.current = res.data.length;
+      const newCount = res.data.length;
+      if (newCount > prevCountRef.current) {
+        Vibration.vibrate([0, 200, 100, 200]);
+        setOrderIdx(0);
+        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 60, friction: 10 }).start();
+      } else if (newCount === 0 && prevCountRef.current > 0) {
+        Animated.timing(slideAnim, { toValue: 300, useNativeDriver: true, duration: 200 }).start();
+      }
+      prevCountRef.current = newCount;
       setAvailOrders(res.data);
     } catch (_) {}
   }
+
+  useEffect(() => {
+    if (availOrders.length > 0) {
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 60, friction: 10 }).start();
+    } else {
+      Animated.timing(slideAnim, { toValue: 300, useNativeDriver: true, duration: 200 }).start();
+    }
+  }, [availOrders.length]);
 
   async function loadData() {
     try {
@@ -148,10 +165,23 @@ export default function HomeDriverScreen({ navigation }) {
 
   async function acceptOrder(id) {
     try {
+      Animated.timing(slideAnim, { toValue: 300, useNativeDriver: true, duration: 200 }).start();
       const res = await ordersAPI.accept(id);
       Alert.alert('✅ Қабылданды', `${res.data.price} тг`);
       loadData();
-    } catch (e) { Alert.alert('Қате', e.response?.data?.detail || 'Қате'); }
+    } catch (e) {
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
+      Alert.alert('Қате', e.response?.data?.detail || 'Қате');
+    }
+  }
+
+  function skipOrder() {
+    const next = (orderIdx + 1) % availOrders.length;
+    setOrderIdx(next);
+    Animated.sequence([
+      Animated.timing(slideAnim, { toValue: 300, useNativeDriver: true, duration: 150 }),
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 60, friction: 10 }),
+    ]).start();
   }
 
   async function finishOrder(id) {
@@ -266,7 +296,7 @@ export default function HomeDriverScreen({ navigation }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: isOnline && availOrders.length > 0 ? 260 : 40 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -422,59 +452,84 @@ export default function HomeDriverScreen({ navigation }) {
           </>
         )}
 
-        {/* ── ТАПСЫРЫСТАР ── */}
-        {isOnline && (
-          <>
-            <Text style={s.sectionTitle}>
-              📥 Тапсырыстар{availOrders.length > 0 ? ` (${availOrders.length})` : ''}
+        {/* ── КҮТУ ИНДИКАТОРЫ ── */}
+        {isOnline && availOrders.length === 0 && (
+          <View style={s.emptyBox}>
+            <Text style={s.emptyEmoji}>🔍</Text>
+            <Text style={s.emptyTitle}>Тапсырыс күтілуде</Text>
+            <Text style={s.emptySub}>
+              Жаңа тапсырыс келгенде{'\n'}хабарландыру келеді
             </Text>
-            {availOrders.length === 0 ? (
-              <View style={s.emptyBox}>
-                <Text style={s.emptyEmoji}>🔍</Text>
-                <Text style={s.emptyTitle}>Тапсырыс жоқ</Text>
-                <Text style={s.emptySub}>
-                  Жаңа тапсырыс келгенде{'\n'}телефон вибрация береді
-                </Text>
-              </View>
-            ) : (
-              availOrders.map((o) => (
-                <View key={o.id} style={s.orderCard}>
-                  <View style={s.orderHead}>
-                    <View style={s.orderTypePill}>
-                      <Text style={{ fontSize: 15 }}>
-                        {o.order_type === 'delivery' ? '📦' : '🚖'}
-                      </Text>
-                      <Text style={s.orderTypeTxt}>
-                        {o.order_type === 'delivery' ? 'Сәлемдеме' : `Такси · ${o.seats} орын`}
-                      </Text>
-                    </View>
-                    <Text style={s.orderPrice}>{o.price} тг</Text>
-                  </View>
-
-                  <View style={s.routeWrap}>
-                    <View style={s.routeLine}>
-                      <View style={[s.dot, { backgroundColor: '#10B981' }]} />
-                      <Text style={s.routeTxt} numberOfLines={1}>{o.from}</Text>
-                    </View>
-                    <View style={s.routeLine}>
-                      <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
-                      <Text style={s.routeTxt} numberOfLines={1}>{o.to}</Text>
-                    </View>
-                  </View>
-
-                  {o.comment ? (
-                    <Text style={s.orderComment}>💬 {o.comment}</Text>
-                  ) : null}
-
-                  <TouchableOpacity style={s.acceptBtn} onPress={() => acceptOrder(o.id)}>
-                    <Text style={s.acceptBtnTxt}>Қабылдау</Text>
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
-          </>
+          </View>
         )}
       </ScrollView>
+
+      {/* ── YANDEX PRO СТИЛІ: ТАПСЫРЫС КАРТОЧКАСЫ ── */}
+      {isOnline && availOrders.length > 0 && (() => {
+        const o = availOrders[orderIdx] || availOrders[0];
+        return (
+          <Animated.View style={[s.orderPopup, { transform: [{ translateY: slideAnim }] }]}>
+            {/* Жоғарғы жол: counter + type */}
+            <View style={s.popupTopRow}>
+              <View style={s.popupTypeBadge}>
+                <Text style={s.popupTypeEmoji}>{o.order_type === 'delivery' ? '📦' : '🚖'}</Text>
+                <Text style={s.popupTypeText}>
+                  {o.order_type === 'delivery' ? 'Сәлемдеме' : `Такси · ${o.seats} орын`}
+                </Text>
+              </View>
+              {availOrders.length > 1 && (
+                <View style={s.popupCounter}>
+                  <Text style={s.popupCounterTxt}>{orderIdx + 1}/{availOrders.length}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Бағасы */}
+            <Text style={s.popupPrice}>{o.price} тг</Text>
+
+            {/* Маршрут */}
+            <View style={s.popupRoute}>
+              <View style={s.popupRouteItem}>
+                <View style={[s.popupDot, { backgroundColor: '#10B981' }]} />
+                <View style={s.popupRouteTextWrap}>
+                  <Text style={s.popupRouteLabel}>Кету нүктесі</Text>
+                  <Text style={s.popupRouteAddr} numberOfLines={1}>{o.from}</Text>
+                </View>
+              </View>
+              <View style={s.popupRouteLine} />
+              <View style={s.popupRouteItem}>
+                <View style={[s.popupDot, { backgroundColor: '#EF4444' }]} />
+                <View style={s.popupRouteTextWrap}>
+                  <Text style={s.popupRouteLabel}>Бару нүктесі</Text>
+                  <Text style={s.popupRouteAddr} numberOfLines={1}>{o.to}</Text>
+                </View>
+              </View>
+            </View>
+
+            {o.comment ? (
+              <View style={s.popupComment}>
+                <Text style={s.popupCommentTxt}>💬 {o.comment}</Text>
+              </View>
+            ) : null}
+
+            {/* Батырмалар */}
+            <View style={s.popupBtns}>
+              {availOrders.length > 1 && (
+                <TouchableOpacity style={s.skipBtn} onPress={skipOrder} activeOpacity={0.8}>
+                  <Text style={s.skipBtnTxt}>Келесі ›</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[s.acceptBigBtn, availOrders.length === 1 && { flex: 1 }]}
+                onPress={() => acceptOrder(o.id)}
+                activeOpacity={0.85}
+              >
+                <Text style={s.acceptBigBtnTxt}>✓  Қабылдау</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        );
+      })()}
     </SafeAreaView>
   );
 }
@@ -612,6 +667,41 @@ const s = StyleSheet.create({
   emptyEmoji: { fontSize: 44, marginBottom: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151', marginBottom: 6 },
   emptySub:   { fontSize: 13, color: '#9CA3AF', textAlign: 'center', lineHeight: 20 },
+
+  /* ── Yandex Pro order popup ── */
+  orderPopup: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, elevation: 20,
+  },
+  popupTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  popupTypeBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F9FAFB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
+  popupTypeEmoji: { fontSize: 16 },
+  popupTypeText:  { fontSize: 14, fontWeight: '700', color: '#374151' },
+  popupCounter:   { backgroundColor: '#1a1a2e', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6 },
+  popupCounterTxt: { color: '#fff', fontWeight: '800', fontSize: 13 },
+
+  popupPrice: { fontSize: 36, fontWeight: '900', color: '#FF6B35', marginBottom: 16 },
+
+  popupRoute: { backgroundColor: '#F9FAFB', borderRadius: 18, padding: 16, marginBottom: 14 },
+  popupRouteItem:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  popupRouteLine:     { width: 2, height: 16, backgroundColor: '#E5E7EB', marginLeft: 9, marginVertical: 4 },
+  popupDot:           { width: 18, height: 18, borderRadius: 9, flexShrink: 0 },
+  popupRouteTextWrap: { flex: 1 },
+  popupRouteLabel:    { fontSize: 10, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  popupRouteAddr:     { fontSize: 14, fontWeight: '700', color: '#1a1a2e' },
+
+  popupComment:    { backgroundColor: '#FFF7ED', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14 },
+  popupCommentTxt: { fontSize: 13, color: '#92400E', fontWeight: '500' },
+
+  popupBtns:    { flexDirection: 'row', gap: 10 },
+  skipBtn:      { flex: 0, borderRadius: 18, paddingVertical: 17, paddingHorizontal: 20, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  skipBtnTxt:   { color: '#374151', fontWeight: '800', fontSize: 15 },
+  acceptBigBtn: { flex: 2, borderRadius: 18, paddingVertical: 17, backgroundColor: '#FF6B35', alignItems: 'center', shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 },
+  acceptBigBtnTxt: { color: '#fff', fontWeight: '900', fontSize: 17 },
 });
 
 /* ─── MODAL STYLES ─── */
