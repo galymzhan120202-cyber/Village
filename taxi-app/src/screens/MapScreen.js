@@ -7,14 +7,11 @@ import MapView, { Marker, UrlTile, Callout, PROVIDER_DEFAULT } from 'react-nativ
 import * as Location from 'expo-location';
 import { driverAPI } from '../services/api';
 
-// Жаңабазар — Қазығұрт ауданы, Түркістан облысы
-// Бейнеткеш, Көкібел, Қарабау, Жеңіс ауылдарын қамтитын аймақ
-// latitudeDelta 0.05 = zoom ~14, үйлер анық көрінеді
 const INITIAL_REGION = {
-  latitude:  41.847,
-  longitude: 69.694,
-  latitudeDelta:  0.05,
-  longitudeDelta: 0.05,
+  latitude:  48.0196,
+  longitude: 66.9237,
+  latitudeDelta:  8.0,
+  longitudeDelta: 8.0,
 };
 
 export default function MapScreen() {
@@ -105,12 +102,17 @@ export default function MapScreen() {
 
       {/* Жоғарғы ақпарат панелі */}
       <View style={styles.topPanel}>
-        <Text style={styles.topTitle}>
-          🚗 Онлайн жүргізушілер: {loading ? '...' : drivers.length}
-        </Text>
-        {lastUpdate && (
-          <Text style={styles.topSub}>Жаңартылды: {lastUpdate}</Text>
-        )}
+        <View style={styles.topLeft}>
+          <Text style={styles.topTitle}>Онлайн жүргізушілер</Text>
+          {lastUpdate && (
+            <Text style={styles.topSub}>🕐 {lastUpdate}</Text>
+          )}
+        </View>
+        <View style={styles.topBadge}>
+          <Text style={styles.topBadgeTxt}>
+            🚗 {loading ? '...' : drivers.length}
+          </Text>
+        </View>
       </View>
 
       {/* Жаңарту батырмасы */}
@@ -146,9 +148,8 @@ export default function MapScreen() {
 
       {drivers.length === 0 && !loading && (
         <View style={styles.noDrivers}>
-          <Text style={styles.noDriversText}>
-            Қазір онлайн жүргізуші жоқ
-          </Text>
+          <Text style={{ fontSize: 18 }}>😔</Text>
+          <Text style={styles.noDriversText}>Қазір онлайн жүргізуші жоқ</Text>
         </View>
       )}
     </View>
@@ -159,52 +160,62 @@ const styles = StyleSheet.create({
   container:      { flex: 1 },
   map:            { flex: 1 },
 
-  topPanel:       {
+  topPanel: {
     position: 'absolute', top: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(244,162,97,0.95)',
-    paddingTop: Platform.OS === 'ios' ? 12 : 8,
-    paddingBottom: 10, paddingHorizontal: 16,
+    backgroundColor: 'rgba(26,26,46,0.92)',
+    paddingTop: Platform.OS === 'ios' ? 14 : 10,
+    paddingBottom: 12, paddingHorizontal: 18,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  topTitle:       { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  topSub:         { color: 'rgba(255,255,255,0.85)', fontSize: 11, marginTop: 2 },
-
-  refreshBtn:     {
-    position: 'absolute', top: Platform.OS === 'ios' ? 70 : 60,
-    right: 12, width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#f4a261', alignItems: 'center', justifyContent: 'center',
-    elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4,
+  topLeft:        {},
+  topTitle:       { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 0.3 },
+  topSub:         { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 },
+  topBadge:       {
+    backgroundColor: 'rgba(255,107,53,0.2)', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(255,107,53,0.4)',
   },
-  refreshText:    { fontSize: 18 },
+  topBadgeTxt:    { color: '#FF6B35', fontWeight: '800', fontSize: 13 },
 
-  myLocBtn:       {
-    position: 'absolute', top: 122, right: 12,
-    width: 44, height: 44, borderRadius: 22,
+  refreshBtn: {
+    position: 'absolute', top: Platform.OS === 'ios' ? 76 : 66,
+    right: 14, width: 46, height: 46, borderRadius: 23,
+    backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center',
+    elevation: 5, shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 8,
+  },
+  refreshText: { fontSize: 18 },
+
+  myLocBtn: {
+    position: 'absolute', top: Platform.OS === 'ios' ? 132 : 122, right: 14,
+    width: 46, height: 46, borderRadius: 23,
     backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
-    elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4,
+    elevation: 5, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8,
   },
-  myLocText:      { fontSize: 20 },
+  myLocText: { fontSize: 20 },
 
-  carMarker:      {
-    backgroundColor: '#fff', borderRadius: 20,
-    padding: 4, borderWidth: 2, borderColor: '#f4a261',
-    elevation: 3,
+  carMarker: {
+    backgroundColor: '#1a1a2e', borderRadius: 22,
+    padding: 6, borderWidth: 2, borderColor: '#FF6B35',
+    elevation: 4,
+    shadowColor: '#FF6B35', shadowOpacity: 0.3, shadowRadius: 4,
   },
-  carEmoji:       { fontSize: 22 },
+  carEmoji: { fontSize: 20 },
 
-  callout:        {
-    backgroundColor: '#fff', borderRadius: 12,
-    padding: 10, minWidth: 150,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
+  callout: {
+    backgroundColor: '#fff', borderRadius: 16,
+    padding: 14, minWidth: 160,
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 6,
   },
-  calloutName:    { fontWeight: 'bold', fontSize: 14, color: '#1a1a2e' },
-  calloutCar:     { color: '#555', fontSize: 12, marginTop: 3 },
-  calloutSeats:   { color: '#f4a261', fontSize: 12, marginTop: 3, fontWeight: '600' },
-  calloutVillage: { color: '#3498db', fontSize: 11, marginTop: 3 },
+  calloutName:    { fontWeight: '800', fontSize: 15, color: '#1a1a2e', marginBottom: 4 },
+  calloutCar:     { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  calloutSeats:   { color: '#FF6B35', fontSize: 13, marginTop: 4, fontWeight: '700' },
+  calloutVillage: { color: '#3B82F6', fontSize: 12, marginTop: 2 },
 
-  noDrivers:      {
-    position: 'absolute', bottom: 30, left: 20, right: 20,
-    backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14,
-    padding: 14, alignItems: 'center', elevation: 4,
+  noDrivers: {
+    position: 'absolute', bottom: 32, left: 24, right: 24,
+    backgroundColor: '#1a1a2e', borderRadius: 18,
+    padding: 16, alignItems: 'center', elevation: 6,
+    flexDirection: 'row', justifyContent: 'center', gap: 8,
   },
-  noDriversText:  { color: '#555', fontSize: 14, fontWeight: '500' },
+  noDriversText: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
 });
