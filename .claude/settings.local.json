@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(netsh advfirewall *)",
+      "Bash(python run_api.py)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Users\\\\AMINA\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe\" -ArgumentList \"run_api.py\" -WorkingDirectory \"C:\\\\Users\\\\AMINA\\\\OneDrive\\\\Рабочий стол\\\\Taxi_zh-city\" -WindowStyle Normal)",
+      "PowerShell(Start-Sleep -Seconds 3; Invoke-WebRequest -Uri \"http://localhost:8000/\" -UseBasicParsing -TimeoutSec 5 | Select-Object -ExpandProperty Content)",
+      "PowerShell(Start-Process -FilePath \"cmd.exe\" -ArgumentList \"/k\", \"cd /d `\"C:\\\\Users\\\\AMINA\\\\OneDrive\\\\Рабочий стол\\\\Taxi_zh-city\\\\taxi-app`\" && npx expo start\" -WindowStyle Normal)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8000/\" -UseBasicParsing -TimeoutSec 3 | Select-Object -ExpandProperty StatusCode)",
+      "PowerShell(Start-Sleep -Seconds 3; Invoke-WebRequest -Uri \"http://localhost:8000/\" -UseBasicParsing -TimeoutSec 5 | Select-Object -ExpandProperty StatusCode)",
+      "PowerShell(npm *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Start-Process -FilePath \"powershell.exe\" -ArgumentList \"-NoExit\", \"-Command\", \"Set-Location 'C:\\\\Users\\\\AMINA\\\\OneDrive\\\\Рабочий стол\\\\Taxi_zh-city\\\\taxi-app'; npx expo start\" -WindowStyle Normal)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Start-Process -FilePath \"powershell.exe\" -ArgumentList \"-NoExit\", \"-Command\", \"Set-Location 'C:\\\\Users\\\\AMINA\\\\OneDrive\\\\Рабочий стол\\\\Taxi_zh-city\\\\taxi-app'; npx expo start --lan\" -WindowStyle Normal)",
+      "PowerShell(Get-NetConnectionProfile *)",
+      "PowerShell(netstat *)",
+      "PowerShell(Get-NetFirewallRule *)",
+      "PowerShell(Test-NetConnection *)",
+      "PowerShell(Start-Process -FilePath \"powershell.exe\" -ArgumentList \"-NoExit\", \"-Command\", \"Set-Location 'C:\\\\Users\\\\AMINA\\\\OneDrive\\\\Рабочий стол\\\\Taxi_zh-city\\\\taxi-app'; npx expo start --lan --clear\" -WindowStyle Normal)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://192.168.101.10:8000/api/auth/register\" -Method POST -ContentType \"application/json\" -Body '{\"name\":\"Test\",\"phone\":\"+77771234567\",\"role\":\"passenger\",\"pin\":\"1234\"}' -UseBasicParsing | Select-Object StatusCode, Content)",
+      "Bash(curl *)",
+      "PowerShell(C:\\\\Users\\\\AMINA\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\python.exe -m pip show bcrypt passlib)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://127.0.0.1:8000/\" -UseBasicParsing)"
+    ]
+  }
+}

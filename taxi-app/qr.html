@@ -1,0 +1,58 @@
+﻿<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Такси Жаңабазар - QR</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    .card { background: white; border-radius: 24px; padding: 40px; max-width: 480px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.12); text-align: center; }
+    h1 { color: #f4a261; font-size: 24px; margin-bottom: 6px; }
+    .sub { color: #888; font-size: 14px; margin-bottom: 28px; }
+    #qrcode { margin: 0 auto 20px; display: inline-block; }
+    .url-box { background: #fff3e0; border-radius: 12px; padding: 12px 16px; margin-bottom: 24px; font-family: monospace; font-size: 15px; color: #e67e22; word-break: break-all; }
+    .steps { text-align: left; }
+    .step { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-radius: 12px; margin-bottom: 8px; background: #f9f9f9; }
+    .step-num { background: #f4a261; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; flex-shrink: 0; }
+    .step-text { font-size: 14px; color: #444; line-height: 1.5; }
+    .step-text b { color: #f4a261; }
+    .warn { background: #fff3cd; border-radius: 12px; padding: 12px; margin-top: 16px; font-size: 13px; color: #856404; }
+    .sdk-badge { display: inline-block; background: #e8f5e9; color: #2e7d32; border-radius: 20px; padding: 4px 14px; font-size: 13px; font-weight: bold; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🚖 Такси Жаңабазар</h1>
+    <p class="sub">Мобилді қосымша</p>
+    <span class="sdk-badge">SDK 54 ✓</span>
+    <br><br>
+    <div id="qrcode"></div>
+    <div class="url-box">exp://10.202.4.188:8081</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Телефонға <b>Expo Go</b> жүктеңіз<br><small>Android: Play Store | iPhone: App Store</small></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Expo Go ашып → <b>"Scan QR code"</b> → жоғарыдағы QR-ды сканерлеңіз</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Немесе → <b>"Enter URL manually"</b> → <code>exp://10.202.4.188:8081</code></div>
+      </div>
+    </div>
+    <div class="warn">⚠️ Телефон мен компьютер <b>бір Wi-Fi желісінде</b> болуы керек!</div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    new QRCode(document.getElementById("qrcode"), {
+      text: "exp://10.202.4.188:8081",
+      width: 220, height: 220,
+      colorDark: "#000000", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  </script>
+</body>
+</html>

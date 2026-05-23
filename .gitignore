@@ -1,0 +1,28 @@
+# База деректер (жергілікті)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python кэш
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Виртуалды орта
+venv/
+env/
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.suo
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
