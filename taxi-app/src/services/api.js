@@ -69,6 +69,7 @@ export const driverAPI = {
   updateLocation: (lat, lon) =>
     api.post(`/api/drivers/location?lat=${lat}&lon=${lon}`),
   onlineDrivers: () => api.get('/api/drivers/online'),
+  savePushToken: (token) => api.post('/api/drivers/push-token', { token }),
 };
 
 // ─── АДМИН ───────────────────────────────────────────────────────────────────

@@ -4,11 +4,21 @@ import {
   StyleSheet, Alert, ActivityIndicator, RefreshControl, Linking, Vibration, Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useNetwork } from '../context/NetworkContext';
 import { driverAPI, ordersAPI } from '../services/api';
 import { startBackgroundLocation, stopBackgroundLocation } from '../tasks/locationTask';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function HomeDriverScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -27,7 +37,7 @@ export default function HomeDriverScreen({ navigation }) {
   const ordersIntervalRef   = useRef(null);
   const prevOrderCountRef   = useRef(0);
 
-  useEffect(() => { loadData(); loadSavedSeats(); }, []);
+  useEffect(() => { loadData(); loadSavedSeats(); registerPushToken(); }, []);
 
   useEffect(() => {
     if (profile?.is_online) {
@@ -45,6 +55,21 @@ export default function HomeDriverScreen({ navigation }) {
       if (ordersIntervalRef.current) clearInterval(ordersIntervalRef.current);
     };
   }, [profile?.is_online]);
+
+  async function registerPushToken() {
+    try {
+      if (!Device.isDevice) return;
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      let finalStatus = existing;
+      if (existing !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') return;
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      await driverAPI.savePushToken(tokenData.data);
+    } catch (_) {}
+  }
 
   async function loadSavedSeats() {
     try {

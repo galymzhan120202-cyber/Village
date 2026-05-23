@@ -71,6 +71,7 @@ def init_api_tables():
         "ALTER TABLE users ADD COLUMN driver_lat REAL DEFAULT 0.0",
         "ALTER TABLE users ADD COLUMN driver_lon REAL DEFAULT 0.0",
         "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN push_token TEXT DEFAULT NULL",
     ]:
         try:
             cursor.execute(col_sql)
@@ -278,6 +279,32 @@ def update_village_coords(village_id: int, lat: float, lon: float):
     )
     conn.commit()
     conn.close()
+
+
+# ─── PUSH TOKENS ─────────────────────────────────────────────────────────────
+
+def save_push_token(user_id: int, token: str):
+    conn = get_connection()
+    conn.execute("UPDATE users SET push_token=? WHERE user_id=?", (token, user_id))
+    conn.commit(); conn.close()
+
+
+def get_online_driver_push_tokens() -> List[str]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT push_token FROM users WHERE role='driver' AND is_online=1 AND is_banned=0 AND push_token IS NOT NULL"
+    )
+    rows = cursor.fetchall(); conn.close()
+    return [r[0] for r in rows if r[0]]
+
+
+def get_user_push_token(user_id: int) -> str:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT push_token FROM users WHERE user_id=?", (user_id,))
+    row = cursor.fetchone(); conn.close()
+    return row[0] if row and row[0] else ""
 
 
 # ─── ТАПСЫРЫСТАР ─────────────────────────────────────────────────────────────

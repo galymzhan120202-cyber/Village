@@ -9,6 +9,7 @@ from api.db import (
     get_user_by_id, get_driver_accepted_orders,
     update_driver_location, get_online_drivers,
     get_driver_active_card, get_weekly_commission_total,
+    save_push_token, get_user_push_token,
 )
 from database import (
     update_driver_work,
@@ -24,6 +25,10 @@ router = APIRouter()
 class StartWorkIn(BaseModel):
     seats: int
     accepts_delivery: bool = True
+
+
+class PushTokenIn(BaseModel):
+    token: str
 
 
 @router.get("/profile", summary="Жүргізуші профилі")
@@ -117,6 +122,12 @@ async def update_location(
     if not user or user["role"] != "driver":
         raise HTTPException(403, "Тек жүргізушілер үшін")
     update_driver_location(uid, lat, lon)
+    return {"ok": True}
+
+
+@router.post("/push-token", summary="Push токенін сақтау")
+async def store_push_token(data: PushTokenIn, uid: int = Depends(get_current_user_id)):
+    save_push_token(uid, data.token)
     return {"ok": True}
 
 

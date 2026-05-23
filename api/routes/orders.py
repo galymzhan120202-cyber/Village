@@ -23,8 +23,9 @@ from database import (
     get_matching_orders,
     save_rating,
 )
-from api.db import get_messages, send_message
+from api.db import get_messages, send_message, get_online_driver_push_tokens, get_user_push_token
 from api.services.payment import charge_commission
+from api.services.push import send_push_to_many, send_push
 
 router = APIRouter()
 
@@ -78,6 +79,16 @@ async def create_order(data: CreateOrderIn, uid: int = Depends(get_current_user_
         cm=data.comment or "",
         sch=None,
     )
+
+    tokens = get_online_driver_push_tokens()
+    type_label = "📦 Сәлемдеме" if data.o_type == "delivery" else "🚖 Такси"
+    await send_push_to_many(
+        tokens,
+        f"{type_label} · {data.price} тг",
+        f"{data.village}, {data.land} → {data.to_loc}",
+        {"order_id": oid},
+    )
+
     return {"order_id": oid, "message": "✅ Тапсырыс жіберілді!"}
 
 
@@ -181,6 +192,10 @@ async def accept_order(order_id: int, uid: int = Depends(get_current_user_id)):
     if status == "taken":
         raise HTTPException(409, "Тапсырысты басқа жүргізуші алды")
     if status == "ok":
+        token = get_user_push_token(pid)
+        if token:
+            driver_name = get_user_by_id(uid)["name"] if get_user_by_id(uid) else "Жүргізуші"
+            await send_push(token, "🚖 Жүргізуші келе жатыр!", f"{driver_name} сіздің тапсырысыңызды қабылдады", {"order_id": order_id})
         return {"message": "✅ Тапсырыс қабылданды!", "price": price}
 
     raise HTTPException(500, "Белгісіз қате")

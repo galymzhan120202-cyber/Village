@@ -6,18 +6,33 @@ import {
 import { ordersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const STATUS_LABEL = {
-  active:   { text: 'Іздеуде',   color: '#f39c12' },
-  accepted: { text: 'Қабылданды', color: '#3498db' },
-  finished: { text: 'Аяқталды',  color: '#2ecc71' },
-  cancelled:{ text: 'Жойылды',   color: '#e74c3c' },
+const STATUS = {
+  active:    { label: 'Іздеуде',    bg: '#FEF9C3', color: '#D97706', dot: '#F59E0B' },
+  accepted:  { label: 'Жолда',      bg: '#EFF6FF', color: '#2563EB', dot: '#3B82F6' },
+  finished:  { label: 'Аяқталды',   bg: '#ECFDF5', color: '#059669', dot: '#10B981' },
+  cancelled: { label: 'Жойылды',    bg: '#FEF2F2', color: '#DC2626', dot: '#EF4444' },
 };
+
+function routeLabel(o) {
+  if (o.route === 'local')           return `${o.village} ← ішінде →`;
+  if (o.route === 'village_city')    return `${o.village} → Шымкент`;
+  if (o.route === 'city_village')    return `Шымкент → ${o.village}`;
+  if (o.route === 'village_village') return `${o.village} → ${o.to_loc}`;
+  return o.village || '—';
+}
+
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return d.toLocaleDateString('kk-KZ', { day: 'numeric', month: 'short' }) +
+    ' ' + d.toLocaleTimeString('kk-KZ', { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function HistoryScreen() {
   const { user } = useAuth();
-  const [orders,    setOrders]    = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [refreshing,setRefreshing]= useState(false);
+  const [orders,     setOrders]     = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -25,7 +40,7 @@ export default function HistoryScreen() {
     try {
       const res = await ordersAPI.history();
       setOrders(res.data);
-    } catch (e) {
+    } catch (_) {
       setOrders([]);
     } finally {
       setLoading(false);
@@ -33,82 +48,146 @@ export default function HistoryScreen() {
     }
   }
 
-  function routeLabel(o) {
-    if (o.route === 'local')           return `${o.village} (ауыл ішінде)`;
-    if (o.route === 'village_city')    return `${o.village} → Шымкент`;
-    if (o.route === 'city_village')    return `Шымкент → ${o.village}`;
-    if (o.route === 'village_village') return `${o.village} → ${o.to_loc}`;
-    return o.village || '—';
-  }
-
   if (loading) {
-    return <View style={s.center}><ActivityIndicator size="large" color="#f4a261" /></View>;
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color="#FF6B35" />
+      </View>
+    );
   }
 
   return (
     <ScrollView
-      style={s.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+      style={s.screen}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => { setRefreshing(true); load(); }}
+          tintColor="#FF6B35"
+        />
+      }
     >
-      <Text style={s.title}>📋 Тапсырыс тарихы</Text>
+      {/* Header */}
+      <View style={s.header}>
+        <Text style={s.headerTitle}>Тарих</Text>
+        <Text style={s.headerSub}>{orders.length} тапсырыс</Text>
+      </View>
 
       {orders.length === 0 ? (
         <View style={s.empty}>
           <Text style={s.emptyIcon}>📭</Text>
-          <Text style={s.emptyText}>Тарих бос</Text>
+          <Text style={s.emptyTitle}>Тарих бос</Text>
+          <Text style={s.emptySub}>Аяқталған тапсырыстар осында көрінеді</Text>
         </View>
       ) : (
-        orders.map((o) => {
-          const st = STATUS_LABEL[o.status] || { text: o.status, color: '#999' };
-          return (
-            <View key={o.id} style={s.card}>
-              <View style={s.cardHeader}>
-                <Text style={s.orderType}>
-                  {o.order_type === 'delivery' ? '📦 Сәлемдеме' : '🚖 Такси'}
-                </Text>
-                <View style={[s.badge, { backgroundColor: st.color + '22', borderColor: st.color }]}>
-                  <Text style={[s.badgeText, { color: st.color }]}>{st.text}</Text>
+        <View style={s.list}>
+          {orders.map((o) => {
+            const st = STATUS[o.status] || { label: o.status, bg: '#F3F4F6', color: '#6B7280', dot: '#9CA3AF' };
+            const fromAddr = o.landmark || (o.route === 'city_village' ? 'Шымкент' : o.village) || '—';
+            const toAddr   = o.to_loc || (o.route === 'village_city' ? 'Шымкент' : o.village) || '—';
+
+            return (
+              <View key={o.id} style={s.card}>
+                {/* Карточка шыңы */}
+                <View style={s.cardTop}>
+                  <View style={s.typeRow}>
+                    <Text style={s.typeIcon}>
+                      {o.order_type === 'delivery' ? '📦' : '🚖'}
+                    </Text>
+                    <Text style={s.typeLabel}>
+                      {o.order_type === 'delivery' ? 'Сәлемдеме' : 'Такси'}
+                    </Text>
+                  </View>
+                  <View style={[s.badge, { backgroundColor: st.bg }]}>
+                    <View style={[s.badgeDot, { backgroundColor: st.dot }]} />
+                    <Text style={[s.badgeText, { color: st.color }]}>{st.label}</Text>
+                  </View>
                 </View>
+
+                {/* Маршрут */}
+                <View style={s.routeBlock}>
+                  <View style={s.addrRow}>
+                    <View style={[s.dot, { backgroundColor: '#10B981' }]} />
+                    <Text style={s.addrTxt} numberOfLines={1}>{fromAddr}</Text>
+                  </View>
+                  <View style={s.addrConnector} />
+                  <View style={s.addrRow}>
+                    <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
+                    <Text style={s.addrTxt} numberOfLines={1}>{toAddr}</Text>
+                  </View>
+                </View>
+
+                {/* Төменгі жол: баға + күн */}
+                <View style={s.cardBottom}>
+                  <Text style={s.price}>{o.price} тг</Text>
+                  <Text style={s.date}>{formatDate(o.created_at)}</Text>
+                </View>
+
+                {/* Рейтинг (аяқталған болса) */}
+                {o.status === 'finished' && o.rating > 0 && (
+                  <View style={s.ratingRow}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Text key={i} style={i <= o.rating ? s.starOn : s.starOff}>★</Text>
+                    ))}
+                  </View>
+                )}
               </View>
-
-              <Text style={s.route}>📍 {routeLabel(o)}</Text>
-              <Text style={s.price}>💰 {o.price} тг</Text>
-
-              {o.created_at ? (
-                <Text style={s.date}>
-                  🕐 {new Date(o.created_at).toLocaleDateString('kk-KZ', {
-                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                  })}
-                </Text>
-              ) : null}
-            </View>
-          );
-        })
+            );
+          })}
+        </View>
       )}
-      <View style={{ height: 30 }} />
     </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#f5f5f5', padding: 16 },
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title:      { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 16 },
+  screen:  { flex: 1, backgroundColor: '#F3F4F6' },
+  center:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  empty:      { alignItems: 'center', marginTop: 60 },
-  emptyIcon:  { fontSize: 48, marginBottom: 12 },
-  emptyText:  { color: '#aaa', fontSize: 16 },
+  header:     { backgroundColor: '#fff', padding: 20, paddingTop: 24, marginBottom: 8 },
+  headerTitle:{ fontSize: 24, fontWeight: '800', color: '#1a1a2e' },
+  headerSub:  { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
 
-  card:       {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16,
-    marginBottom: 12, elevation: 2,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4,
+  empty:      { alignItems: 'center', marginTop: 80, paddingHorizontal: 40 },
+  emptyIcon:  { fontSize: 56, marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151', marginBottom: 6 },
+  emptySub:   { fontSize: 14, color: '#9CA3AF', textAlign: 'center' },
+
+  list:     { paddingHorizontal: 16, paddingTop: 4 },
+
+  card:     {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  orderType:  { fontWeight: 'bold', fontSize: 14, color: '#1a1a2e' },
-  badge:      { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1 },
-  badgeText:  { fontSize: 12, fontWeight: '600' },
-  route:      { color: '#555', fontSize: 14, marginBottom: 4 },
-  price:      { fontWeight: 'bold', color: '#1a1a2e', fontSize: 14, marginBottom: 4 },
-  date:       { color: '#aaa', fontSize: 12 },
+
+  cardTop:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  typeRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  typeIcon:  { fontSize: 18 },
+  typeLabel: { fontSize: 15, fontWeight: '700', color: '#1a1a2e' },
+
+  badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, gap: 5 },
+  badgeDot:   { width: 7, height: 7, borderRadius: 4 },
+  badgeText:  { fontSize: 12, fontWeight: '700' },
+
+  routeBlock: { backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, marginBottom: 12, gap: 6 },
+  addrRow:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dot:        { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  addrTxt:    { flex: 1, fontSize: 14, color: '#374151', fontWeight: '500' },
+  addrConnector: { width: 1, height: 6, backgroundColor: '#D1D5DB', marginLeft: 4 },
+
+  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  price:      { fontSize: 16, fontWeight: '800', color: '#FF6B35' },
+  date:       { fontSize: 12, color: '#9CA3AF' },
+
+  ratingRow:  { flexDirection: 'row', marginTop: 10, gap: 2 },
+  starOn:     { fontSize: 16, color: '#F59E0B' },
+  starOff:    { fontSize: 16, color: '#D1D5DB' },
 });
