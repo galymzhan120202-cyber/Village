@@ -18,8 +18,9 @@ const INITIAL_REGION = {
 };
 
 const SERVICES = [
-  { key: 'local',    icon: '🚖', label: 'Такси',     color: '#FF6B35', bg: '#FFF3EF' },
-  { key: 'delivery', icon: '📦', label: 'Сәлемдеме', color: '#8B5CF6', bg: '#F5F3FF' },
+  { key: 'local',     icon: '🚖', label: 'Такси',       color: '#FF6B35', bg: '#FFF3EF' },
+  { key: 'intercity', icon: '🏙️', label: 'Қалааралық',  color: '#3B82F6', bg: '#EFF6FF' },
+  { key: 'delivery',  icon: '📦', label: 'Сәлемдеме',   color: '#8B5CF6', bg: '#F5F3FF' },
 ];
 
 export default function HomePassengerScreen({ navigation }) {
@@ -500,13 +501,13 @@ const s = StyleSheet.create({
   searchArrowTxt: { color: '#fff', fontSize: 20, fontWeight: '300', marginTop: -2 },
 
   /* Services */
-  servicesRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 14 },
+  servicesRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 14 },
   serviceTile: {
-    flex: 1, borderRadius: 18, padding: 16, alignItems: 'center',
+    flex: 1, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 8, alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
-  serviceTileIcon:  { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  serviceTileLabel: { fontSize: 14, fontWeight: '800' },
+  serviceTileIcon:  { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  serviceTileLabel: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
 
   /* Drivers */
   driversSection:      { paddingHorizontal: 16, marginBottom: 12 },

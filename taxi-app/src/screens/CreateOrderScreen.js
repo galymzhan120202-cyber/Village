@@ -11,8 +11,14 @@ import { ordersAPI } from '../services/api';
 const KZ_CENTER = { latitude: 48.0196, longitude: 66.9237, latitudeDelta: 12, longitudeDelta: 15 };
 
 const TABS = [
-  { key: 'local',    icon: '🚖', label: 'Такси',     color: '#FF6B35' },
-  { key: 'delivery', icon: '📦', label: 'Сәлемдеме', color: '#8B5CF6' },
+  { key: 'local',     icon: '🚖', label: 'Такси',      color: '#FF6B35' },
+  { key: 'intercity', icon: '🏙️', label: 'Қалааралық', color: '#3B82F6' },
+  { key: 'delivery',  icon: '📦', label: 'Сәлемдеме',  color: '#8B5CF6' },
+];
+
+const DIRECTIONS = [
+  { key: 'village_city',   icon: '🏠→🏙️', label: 'Ауылдан қалаға',  sub: 'Шымкент бағытына' },
+  { key: 'city_village',   icon: '🏙️→🏠', label: 'Қаладан ауылға',  sub: 'Ауылға қайту'      },
 ];
 
 // ─── GPS ──────────────────────────────────────────────────────────────────────
@@ -186,6 +192,29 @@ function SeatsRow({ value, onChange }) {
   );
 }
 
+function IntercitySeatsRow({ value, onChange }) {
+  return (
+    <View style={s.intercitySeatsRow}>
+      {[
+        { n: 4, emoji: '🚗', lbl: 'Жеңіл авто' },
+        { n: 6, emoji: '🚐', lbl: 'Микроавтобус' },
+      ].map(({ n, emoji, lbl }) => (
+        <TouchableOpacity
+          key={n}
+          style={[s.intercitySeatCard, value === n && s.intercitySeatCardOn]}
+          onPress={() => onChange(n)}
+          activeOpacity={0.8}
+        >
+          <Text style={s.intercitySeatEmoji}>{emoji}</Text>
+          <Text style={[s.intercitySeatNum, value === n && s.intercitySeatNumOn]}>{n}</Text>
+          <Text style={[s.intercitySeatUnit, value === n && s.intercitySeatUnitOn]}>орын</Text>
+          <Text style={[s.intercitySeatLbl, value === n && s.intercitySeatLblOn]}>{lbl}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
 // ─── Адрес карточкасы ─────────────────────────────────────────────────────────
 function AddrCard({ fromVal, toVal, onFromChange, onToChange, onMapPress }) {
   return (
@@ -343,13 +372,143 @@ function DeliveryForm({ onSubmit, loading }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 3. ҚАЛААРАЛЫҚ
+// ══════════════════════════════════════════════════════════════════════════════
+function IntercityForm({ onSubmit, loading }) {
+  const [direction, setDirection] = useState('village_city');
+  const [village,   setVillage]   = useState('');
+  const [from,      setFrom]      = useState('');
+  const [to,        setTo]        = useState('');
+  const [seats,     setSeats]     = useState(4);
+  const [price,     setPrice]     = useState('1500');
+  const [comment,   setComment]   = useState('');
+
+  const isVC = direction === 'village_city';
+
+  function submit() {
+    if (!village.trim()) { Alert.alert('', 'Ауылдың атын жазыңыз'); return; }
+    if (!from.trim())    { Alert.alert('', 'Кету мекенжайын жазыңыз'); return; }
+    if (!to.trim())      { Alert.alert('', 'Бару мекенжайын жазыңыз'); return; }
+    if (!price || parseInt(price) <= 0) { Alert.alert('', 'Баға жазыңыз'); return; }
+    onSubmit({
+      o_type:  'taxi',
+      village: village.trim(),
+      route:   direction,
+      land:    from.trim(),
+      to_loc:  to.trim(),
+      price:   parseInt(price),
+      seats,
+      comment: comment.trim() || undefined,
+    });
+  }
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+      {/* Бағыт таңдау */}
+      <Label text="Бағыт" />
+      <View style={s.dirRow}>
+        {DIRECTIONS.map(d => (
+          <TouchableOpacity
+            key={d.key}
+            style={[s.dirCard, direction === d.key && s.dirCardOn]}
+            onPress={() => setDirection(d.key)}
+            activeOpacity={0.8}
+          >
+            <Text style={s.dirIcon}>{d.icon}</Text>
+            <Text style={[s.dirLabel, direction === d.key && s.dirLabelOn]}>{d.label}</Text>
+            <Text style={[s.dirSub,   direction === d.key && s.dirSubOn]}>{d.sub}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Ауыл */}
+      <Label text="Ауыл атауы" />
+      <View style={s.addrCard}>
+        <View style={s.addrRow}>
+          <Text style={{ fontSize: 18, marginRight: 4 }}>🏘️</Text>
+          <TextInput
+            style={s.addrInput}
+            placeholder="Ауылдың атауы..."
+            value={village}
+            onChangeText={setVillage}
+            placeholderTextColor="#9CA3AF"
+          />
+        </View>
+      </View>
+
+      {/* Кету/Бару адрестері */}
+      <Label text={isVC ? 'Ауылдағы мекенжай → Шымкенттегі мекенжай' : 'Шымкенттегі мекенжай → Ауылдағы мекенжай'} />
+      <View style={s.addrCard}>
+        <View style={s.addrRow}>
+          <View style={[s.dot, { backgroundColor: '#10B981' }]} />
+          <TextInput
+            style={s.addrInput}
+            placeholder={isVC ? 'Ауылдағы үй/көше...' : 'Шымкент, көше/аудан...'}
+            value={from}
+            onChangeText={setFrom}
+            placeholderTextColor="#9CA3AF"
+          />
+        </View>
+        <View style={s.addrLine} />
+        <View style={s.addrRow}>
+          <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
+          <TextInput
+            style={s.addrInput}
+            placeholder={isVC ? 'Шымкент, көше/аудан...' : 'Ауылдағы үй/көше...'}
+            value={to}
+            onChangeText={setTo}
+            placeholderTextColor="#9CA3AF"
+          />
+        </View>
+      </View>
+
+      {/* Орын саны */}
+      <Label text="Орын саны" />
+      <IntercitySeatsRow value={seats} onChange={setSeats} />
+
+      {/* Баға */}
+      <Label text="Баға (теңге)" />
+      <PriceHint text="Ауыл–Шымкент орташа: 1000–2500 тг/орын" />
+      <TextInput
+        style={s.input}
+        placeholder="1500"
+        value={price}
+        onChangeText={setPrice}
+        keyboardType="numeric"
+        placeholderTextColor="#9CA3AF"
+      />
+
+      <Label text="Ескертпе (міндетті емес)" />
+      <TextInput
+        style={[s.input, s.inputMulti]}
+        placeholder="Шығатын уақыт, қосымша талаптар..."
+        value={comment}
+        onChangeText={setComment}
+        multiline numberOfLines={2}
+        placeholderTextColor="#9CA3AF"
+      />
+
+      <TouchableOpacity style={[s.submitBtn, { backgroundColor: '#3B82F6' }]} onPress={submit} disabled={loading}>
+        {loading
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={s.submitTxt}>🏙️  Тапсырыс жіберу</Text>}
+      </TouchableOpacity>
+      <View style={{ height: 60 }} />
+    </ScrollView>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // НЕГІЗГІ ЭКРАН
 // ══════════════════════════════════════════════════════════════════════════════
 export default function CreateOrderScreen({ navigation, route }) {
   const paramType = route?.params?.type || 'local';
   const initTab   = TABS.find(t => t.key === paramType)?.key || 'local';
+  // 'intercity' route type maps to intercity tab
+  const resolvedTab = paramType === 'intercity' ? 'intercity' : initTab;
 
-  const [activeTab, setActiveTab] = useState(initTab);
+  const [activeTab, setActiveTab] = useState(resolvedTab);
   const [loading,   setLoading]   = useState(false);
 
   async function handleSubmit(data) {
@@ -391,8 +550,9 @@ export default function CreateOrderScreen({ navigation, route }) {
       </View>
 
       <View style={s.formArea}>
-        {activeTab === 'local'    && <TaxiForm    onSubmit={handleSubmit} loading={loading} />}
-        {activeTab === 'delivery' && <DeliveryForm onSubmit={handleSubmit} loading={loading} />}
+        {activeTab === 'local'     && <TaxiForm      onSubmit={handleSubmit} loading={loading} />}
+        {activeTab === 'intercity' && <IntercityForm onSubmit={handleSubmit} loading={loading} />}
+        {activeTab === 'delivery'  && <DeliveryForm  onSubmit={handleSubmit} loading={loading} />}
       </View>
     </KeyboardAvoidingView>
   );
@@ -436,6 +596,35 @@ const s = StyleSheet.create({
 
   submitBtn: { marginTop: 24, backgroundColor: '#FF6B35', borderRadius: 16, padding: 17, alignItems: 'center', shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 },
   submitTxt: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+
+  /* Direction picker (intercity) */
+  dirRow:    { flexDirection: 'row', gap: 10, marginBottom: 2 },
+  dirCard:   {
+    flex: 1, borderRadius: 16, paddingVertical: 18, paddingHorizontal: 12,
+    alignItems: 'center', backgroundColor: '#fff',
+    borderWidth: 2, borderColor: '#E5E7EB', elevation: 1,
+  },
+  dirCardOn:  { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
+  dirIcon:    { fontSize: 24, marginBottom: 6 },
+  dirLabel:   { fontSize: 13, fontWeight: '800', color: '#374151', textAlign: 'center', marginBottom: 3 },
+  dirLabelOn: { color: '#1D4ED8' },
+  dirSub:     { fontSize: 11, color: '#9CA3AF', textAlign: 'center' },
+  dirSubOn:   { color: '#3B82F6' },
+
+  /* Intercity seat tiles */
+  intercitySeatsRow:    { flexDirection: 'row', gap: 14, marginBottom: 2 },
+  intercitySeatCard:    {
+    flex: 1, borderRadius: 20, paddingVertical: 22, alignItems: 'center',
+    backgroundColor: '#F9FAFB', borderWidth: 2, borderColor: '#E5E7EB',
+  },
+  intercitySeatCardOn:  { backgroundColor: '#1a1a2e', borderColor: '#1a1a2e' },
+  intercitySeatEmoji:   { fontSize: 30, marginBottom: 8 },
+  intercitySeatNum:     { fontSize: 36, fontWeight: '900', color: '#1a1a2e' },
+  intercitySeatNumOn:   { color: '#FF6B35' },
+  intercitySeatUnit:    { fontSize: 12, fontWeight: '700', color: '#9CA3AF', marginTop: 2 },
+  intercitySeatUnitOn:  { color: 'rgba(255,255,255,0.45)' },
+  intercitySeatLbl:     { fontSize: 11, color: '#D1D5DB', marginTop: 5 },
+  intercitySeatLblOn:   { color: 'rgba(255,255,255,0.3)' },
 });
 
 const ms = StyleSheet.create({
