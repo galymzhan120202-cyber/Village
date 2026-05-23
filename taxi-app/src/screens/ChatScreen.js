@@ -77,7 +77,7 @@ export default function ChatScreen({ route }) {
   }
 
   if (loading) {
-    return <View style={s.center}><ActivityIndicator color="#f4a261" size="large" /></View>;
+    return <View style={s.center}><ActivityIndicator color="#FF6B35" size="large" /></View>;
   }
 
   return (
@@ -131,45 +131,61 @@ export default function ChatScreen({ route }) {
 }
 
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#f0f0f0' },
+  container:  { flex: 1, backgroundColor: '#F3F4F6' },
   center:     { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list:       { padding: 12, paddingBottom: 8, flexGrow: 1 },
+  list:       { padding: 14, paddingBottom: 8, flexGrow: 1 },
 
   emptyWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  emptyIcon:  { fontSize: 48, marginBottom: 12 },
-  emptyText:  { fontSize: 16, fontWeight: 'bold', color: '#888' },
-  emptySub:   { fontSize: 13, color: '#bbb', marginTop: 4 },
+  emptyIcon:  { fontSize: 52, marginBottom: 14 },
+  emptyText:  { fontSize: 17, fontWeight: '800', color: '#374151', marginBottom: 4 },
+  emptySub:   { fontSize: 13, color: '#9CA3AF' },
 
   msgRow:     { flexDirection: 'row', marginBottom: 10, alignItems: 'flex-end' },
   msgRowMine: { justifyContent: 'flex-end' },
   msgRowOther:{ justifyContent: 'flex-start' },
 
-  avatar:     { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginRight: 6, borderWidth: 1, borderColor: '#e0e0e0' },
+  avatar:     {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+    marginRight: 8, borderWidth: 1.5, borderColor: '#E5E7EB',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 3, elevation: 2,
+  },
   avatarText: { fontSize: 16 },
 
-  bubble:      { maxWidth: '75%', borderRadius: 18, padding: 10, paddingHorizontal: 14 },
-  bubbleMine:  { backgroundColor: '#f4a261', borderBottomRightRadius: 4 },
-  bubbleOther: { backgroundColor: '#fff', borderBottomLeftRadius: 4, elevation: 1, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 3 },
+  bubble:      { maxWidth: '78%', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleMine:  {
+    backgroundColor: '#FF6B35', borderBottomRightRadius: 6,
+    shadowColor: '#FF6B35', shadowOpacity: 0.25, shadowRadius: 6, elevation: 3,
+  },
+  bubbleOther: {
+    backgroundColor: '#fff', borderBottomLeftRadius: 6,
+    shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 4, elevation: 2,
+  },
 
-  senderName:  { fontSize: 11, fontWeight: '700', color: '#f4a261', marginBottom: 3 },
-  msgText:     { fontSize: 15, color: '#1a1a2e', lineHeight: 20 },
+  senderName:  { fontSize: 11, fontWeight: '700', color: '#FF6B35', marginBottom: 3 },
+  msgText:     { fontSize: 15, color: '#1a1a2e', lineHeight: 21 },
   msgTextMine: { color: '#fff' },
-  msgTime:     { fontSize: 10, color: '#aaa', marginTop: 4, alignSelf: 'flex-end' },
-  msgTimeMine: { color: 'rgba(255,255,255,0.7)' },
+  msgTime:     { fontSize: 10, color: '#9CA3AF', marginTop: 5, alignSelf: 'flex-end' },
+  msgTimeMine: { color: 'rgba(255,255,255,0.65)' },
 
   inputRow: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    backgroundColor: '#fff', padding: 10, paddingHorizontal: 14,
-    borderTopWidth: 1, borderTopColor: '#eee',
-    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    backgroundColor: '#fff', paddingHorizontal: 14, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 4,
   },
   input: {
-    flex: 1, backgroundColor: '#f5f5f5', borderRadius: 22,
+    flex: 1, backgroundColor: '#F9FAFB', borderRadius: 22,
     paddingHorizontal: 16, paddingVertical: 10, fontSize: 15,
-    maxHeight: 100, color: '#1a1a2e', marginRight: 8,
-    borderWidth: 1, borderColor: '#e8e8e8',
+    maxHeight: 100, color: '#1a1a2e',
+    borderWidth: 1.5, borderColor: '#E5E7EB',
   },
-  sendBtn:    { width: 44, height: 44, borderRadius: 22, backgroundColor: '#f4a261', alignItems: 'center', justifyContent: 'center', elevation: 2 },
-  sendBtnOff: { backgroundColor: '#ddd' },
-  sendIcon:   { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  sendBtn:    {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+  },
+  sendBtnOff: { backgroundColor: '#E5E7EB', shadowOpacity: 0, elevation: 0 },
+  sendIcon:   { color: '#fff', fontSize: 18 },
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, RefreshControl, Linking, Vibration, Platform,
+  StyleSheet, Alert, ActivityIndicator, RefreshControl, Linking, Vibration, Platform, Modal,
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -198,16 +198,71 @@ export default function HomeDriverScreen({ navigation }) {
   return (
     <ScrollView
       style={s.screen}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#FF6B35" />}
     >
+
+      {/* ── ЖҰМЫСҚА ШЫҒУ МОДАЛЫ ── */}
+      <Modal visible={showForm} transparent animationType="slide" onRequestClose={() => setShowForm(false)}>
+        <View style={s.overlay}>
+          <TouchableOpacity style={s.overlayBg} activeOpacity={1} onPress={() => setShowForm(false)} />
+          <View style={s.startSheet}>
+            <View style={s.sheetHandle} />
+
+            <View style={s.sheetTitleRow}>
+              <View style={s.sheetIconWrap}>
+                <Text style={{ fontSize: 28 }}>🚗</Text>
+              </View>
+              <View>
+                <Text style={s.sheetTitle}>Жұмысқа шығу</Text>
+                <Text style={s.sheetSub}>Орын санын таңдап, бастаңыз</Text>
+              </View>
+            </View>
+
+            {/* Қосылатын мүмкіндіктер */}
+            <View style={s.featureRow}>
+              <View style={s.featureBadge}><Text style={s.featureTxt}>✓  Барлық маршруттар</Text></View>
+              <View style={s.featureBadge}><Text style={s.featureTxt}>✓  Барлық ауылдар</Text></View>
+              <View style={s.featureBadge}><Text style={s.featureTxt}>✓  Сәлемдеме</Text></View>
+            </View>
+
+            <Text style={s.seatsLabel}>Орын санын таңдаңыз</Text>
+
+            <View style={s.seatsGrid}>
+              {[1, 2, 3, 4, 5, 6].map((n) => {
+                const on = seats === n;
+                return (
+                  <TouchableOpacity key={n} style={[s.seatTile, on && s.seatTileOn]} onPress={() => setSeats(n)}>
+                    <Text style={[s.seatTileNum, on && s.seatTileNumOn]}>{n}</Text>
+                    <Text style={s.seatTileIcon}>
+                      {n <= 3 ? '👤'.repeat(n) : `👤×${n}`}
+                    </Text>
+                    <Text style={[s.seatTileLbl, on && s.seatTileLblOn]}>орын</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity style={s.goWorkBtn} onPress={startWork}>
+              <Text style={s.goWorkTxt}>🚀  Жұмысты бастау</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.cancelWorkBtn} onPress={() => setShowForm(false)}>
+              <Text style={s.cancelWorkTxt}>Болдырмау</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── HEADER ── */}
       <View style={s.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.name}>{user?.name} 🚗</Text>
-          <Text style={s.status}>
-            {profile?.is_online ? '🟢 Жұмыста' : '🔴 Оффлайн'}
-            {'  ·  '}⭐ {profile?.rating ?? '5.0'}
-          </Text>
+        <View style={s.headerLeft}>
+          <Text style={s.name}>{user?.name}</Text>
+          <View style={s.statusRow}>
+            <View style={[s.statusDot, { backgroundColor: profile?.is_online ? '#10B981' : '#EF4444' }]} />
+            <Text style={s.statusTxt}>{profile?.is_online ? 'Жұмыста' : 'Оффлайн'}</Text>
+            <Text style={s.statusSep}>·</Text>
+            <Text style={s.statusTxt}>⭐ {profile?.rating ?? '5.0'}</Text>
+          </View>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={s.avatarBtn}>
           <Text style={s.avatarTxt}>{(user?.name || 'D')[0].toUpperCase()}</Text>
@@ -220,38 +275,39 @@ export default function HomeDriverScreen({ navigation }) {
         </View>
       )}
 
-      {/* ── ЖҰМЫС БАТЫРМАЛАРЫ ── */}
-      <View style={s.workRow}>
-        {profile?.is_online ? (
-          <TouchableOpacity style={[s.workBtn, s.stopBtn]} onPress={stopWork}>
-            <Text style={s.workBtnTxt}>🛑  Тоқтату</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={[s.workBtn, s.startBtn]} onPress={() => setShowForm(v => !v)}>
-            <Text style={s.workBtnTxt}>🚀  Жұмысқа шығу</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={[s.workBtn, s.earningsBtn]} onPress={() => navigation.navigate('Earnings')}>
-          <Text style={s.workBtnTxt}>💰  Табыс</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── ЖҰМЫСҚА ШЫҒУ ФОРМАСЫ ── */}
-      {showForm && (
-        <View style={s.form}>
-          <Text style={s.formTitle}>Орын саны: <Text style={{ color: '#FF6B35' }}>{seats}</Text></Text>
-          <View style={s.seatsRow}>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <TouchableOpacity key={n}
-                style={[s.seatBtn, seats === n && s.seatBtnOn]}
-                onPress={() => setSeats(n)}>
-                <Text style={[s.seatTxt, seats === n && s.seatTxtOn]}>{n}</Text>
-              </TouchableOpacity>
-            ))}
+      {/* ── ЖҰМЫС БАСҚАРМАСЫ ── */}
+      {profile?.is_online ? (
+        <View style={s.onlineCard}>
+          <View style={s.onlineInfo}>
+            <View style={[s.onlineDot]} />
+            <View>
+              <Text style={s.onlineTitle}>Жұмыста 🟢</Text>
+              <Text style={s.onlineSub}>{profile?.current_seats ?? seats} орын · Барлық маршрут</Text>
+            </View>
           </View>
-          <TouchableOpacity style={s.confirmBtn} onPress={startWork}>
-            <Text style={s.confirmTxt}>✅  Жұмысқа шығу</Text>
-          </TouchableOpacity>
+          <View style={s.onlineBtns}>
+            <TouchableOpacity style={s.earningsMiniBtn} onPress={() => navigation.navigate('Earnings')}>
+              <Text style={s.earningsMiniBtnTxt}>💰 Табыс</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.stopMiniBtn} onPress={stopWork}>
+              <Text style={s.stopMiniBtnTxt}>🛑 Тоқтату</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View style={s.offlineCard}>
+          <View style={s.offlineCardLeft}>
+            <Text style={s.offlineCardTitle}>Жұмысқа шығыңыз</Text>
+            <Text style={s.offlineCardSub}>Тапсырыс қабылдауды бастаңыз</Text>
+          </View>
+          <View style={s.offlineCardBtns}>
+            <TouchableOpacity style={s.earningsOutlineBtn} onPress={() => navigation.navigate('Earnings')}>
+              <Text style={s.earningsOutlineTxt}>💰</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.startCardBtn} onPress={() => setShowForm(true)}>
+              <Text style={s.startCardBtnTxt}>🚀 Бастау</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -376,34 +432,93 @@ const s = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: '#F3F4F6' },
   center:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
+  /* ── MODAL START WORK ── */
+  overlay:      { flex: 1, justifyContent: 'flex-end' },
+  overlayBg:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  startSheet:   {
+    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 28, paddingTop: 8,
+  },
+  sheetHandle:  { width: 44, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 20 },
+  sheetTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  sheetIconWrap:{ width: 56, height: 56, borderRadius: 18, backgroundColor: '#FFF3EF', alignItems: 'center', justifyContent: 'center' },
+  sheetTitle:   { fontSize: 22, fontWeight: '900', color: '#1a1a2e' },
+  sheetSub:     { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
+
+  featureRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  featureBadge: { backgroundColor: '#ECFDF5', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  featureTxt:   { fontSize: 12, fontWeight: '700', color: '#059669' },
+
+  seatsLabel:   { fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  seatsGrid:    { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  seatTile:     {
+    flex: 1, borderRadius: 16, paddingVertical: 12, alignItems: 'center',
+    backgroundColor: '#F9FAFB', borderWidth: 2, borderColor: '#E5E7EB',
+  },
+  seatTileOn:   { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
+  seatTileNum:  { fontSize: 22, fontWeight: '900', color: '#374151', marginBottom: 2 },
+  seatTileNumOn:{ color: '#fff' },
+  seatTileIcon: { fontSize: 10, marginBottom: 2 },
+  seatTileLbl:  { fontSize: 9, color: '#9CA3AF', fontWeight: '600' },
+  seatTileLblOn:{ color: 'rgba(255,255,255,0.8)' },
+
+  goWorkBtn:    {
+    backgroundColor: '#10B981', borderRadius: 18, paddingVertical: 18,
+    alignItems: 'center', marginBottom: 10,
+    shadowColor: '#10B981', shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+  },
+  goWorkTxt:    { color: '#fff', fontWeight: '900', fontSize: 17, letterSpacing: 0.3 },
+  cancelWorkBtn:{ paddingVertical: 14, alignItems: 'center' },
+  cancelWorkTxt:{ color: '#9CA3AF', fontWeight: '600', fontSize: 15 },
+
   /* Header */
-  header:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, marginBottom: 8 },
-  name:      { fontSize: 18, fontWeight: '800', color: '#1a1a2e' },
-  status:    { color: '#888', marginTop: 3, fontSize: 13 },
-  avatarBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center' },
-  avatarTxt: { color: '#fff', fontWeight: '800', fontSize: 18 },
+  header:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 14, marginBottom: 2 },
+  headerLeft: { flex: 1 },
+  name:       { fontSize: 20, fontWeight: '900', color: '#1a1a2e' },
+  statusRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  statusDot:  { width: 8, height: 8, borderRadius: 4 },
+  statusTxt:  { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  statusSep:  { fontSize: 13, color: '#D1D5DB' },
+  avatarBtn:  { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center', shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
+  avatarTxt:  { color: '#fff', fontWeight: '900', fontSize: 19 },
 
   offlineBanner: { backgroundColor: '#EF4444', paddingVertical: 8, alignItems: 'center' },
   offlineTxt:    { color: '#fff', fontWeight: '700' },
 
-  /* Жұмыс */
-  workRow:    { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 12 },
-  workBtn:    { flex: 1, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  startBtn:   { backgroundColor: '#10B981' },
-  stopBtn:    { backgroundColor: '#EF4444' },
-  earningsBtn:{ backgroundColor: '#FF6B35' },
-  workBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  /* ── ОНЛАЙН КАРТА ── */
+  onlineCard:  {
+    marginHorizontal: 16, marginBottom: 12, backgroundColor: '#1a1a2e',
+    borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#1a1a2e', shadowOpacity: 0.25, shadowRadius: 10, elevation: 5,
+  },
+  onlineInfo:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  onlineDot:   { width: 12, height: 12, borderRadius: 6, backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 1, shadowRadius: 4 },
+  onlineTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  onlineSub:   { fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
+  onlineBtns:  { flexDirection: 'row', gap: 8 },
+  earningsMiniBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  earningsMiniBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  stopMiniBtn: { backgroundColor: '#EF4444', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
+  stopMiniBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  /* Форма */
-  form:       { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 16, padding: 16, marginBottom: 12, elevation: 2 },
-  formTitle:  { fontSize: 15, fontWeight: '700', color: '#1a1a2e', marginBottom: 12 },
-  seatsRow:   { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  seatBtn:    { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB' },
-  seatBtnOn:  { backgroundColor: '#FF6B35', borderColor: '#FF6B35' },
-  seatTxt:    { fontWeight: '700', color: '#555', fontSize: 16 },
-  seatTxtOn:  { color: '#fff' },
-  confirmBtn: { backgroundColor: '#10B981', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  confirmTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  /* ── ОФЛАЙН КАРТА ── */
+  offlineCard:  {
+    marginHorizontal: 16, marginBottom: 12, backgroundColor: '#fff',
+    borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center',
+    borderWidth: 2, borderColor: '#F3F4F6',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  offlineCardLeft:  { flex: 1 },
+  offlineCardTitle: { fontSize: 16, fontWeight: '800', color: '#1a1a2e' },
+  offlineCardSub:   { fontSize: 12, color: '#9CA3AF', marginTop: 3 },
+  offlineCardBtns:  { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  earningsOutlineBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#FFF3EF', alignItems: 'center', justifyContent: 'center' },
+  earningsOutlineTxt: { fontSize: 20 },
+  startCardBtn: {
+    backgroundColor: '#10B981', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 12,
+    shadowColor: '#10B981', shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+  },
+  startCardBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
 
   /* Section */
   sectionTitle: { fontSize: 15, fontWeight: '800', paddingHorizontal: 16, marginTop: 4, marginBottom: 8, color: '#1a1a2e' },
