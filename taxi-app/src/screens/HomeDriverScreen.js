@@ -35,6 +35,7 @@ export default function HomeDriverScreen({ navigation }) {
   const [showForm,     setShowForm]     = useState(false);
   const [seats,        setSeats]        = useState(4);
   const [orderIdx,     setOrderIdx]     = useState(0);
+  const [selRoutes,    setSelRoutes]    = useState(['local','village_city','city_village','village_village']);
 
   const slideAnim   = useRef(new Animated.Value(300)).current;
   const locationRef = useRef(null);
@@ -145,10 +146,18 @@ export default function HomeDriverScreen({ navigation }) {
     finally { setLoading(false); setRefreshing(false); }
   }
 
+  function toggleRoute(key) {
+    setSelRoutes(prev =>
+      prev.includes(key)
+        ? prev.length > 1 ? prev.filter(r => r !== key) : prev  // кемінде 1 болуы керек
+        : [...prev, key]
+    );
+  }
+
   async function startWork() {
     try {
       await AsyncStorage.setItem('driver_seats', String(seats));
-      await driverAPI.startWork({ seats, accepts_delivery: true });
+      await driverAPI.startWork({ seats, accepts_delivery: true, routes: selRoutes });
       setShowForm(false);
       loadData();
     } catch (e) {
@@ -253,13 +262,29 @@ export default function HomeDriverScreen({ navigation }) {
               ))}
             </View>
 
-            <View style={m.infoBox}>
-              {['Барлық маршруттар', 'Барлық ауылдар', 'Сәлемдеме жеткізу'].map(t => (
-                <View key={t} style={m.infoRow}>
-                  <View style={m.infoDot} />
-                  <Text style={m.infoTxt}>{t}</Text>
-                </View>
-              ))}
+            {/* Маршрут таңдау */}
+            <Text style={m.routeTitle}>Қандай тапсырыс аласыз?</Text>
+            <View style={m.routeGrid}>
+              {[
+                { key: 'local',           emoji: '🏘️', label: 'Ішкі'       },
+                { key: 'village_city',    emoji: '↗️',  label: 'Қалаға'     },
+                { key: 'city_village',    emoji: '↙️',  label: 'Ауылға'     },
+                { key: 'village_village', emoji: '🔄',  label: 'Ауыл–Ауыл' },
+              ].map(({ key, emoji, label }) => {
+                const on = selRoutes.includes(key);
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[m.routeChip, on && m.routeChipOn]}
+                    onPress={() => toggleRoute(key)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={m.routeChipEmoji}>{emoji}</Text>
+                    <Text style={[m.routeChipLbl, on && m.routeChipLblOn]}>{label}</Text>
+                    {on && <View style={m.routeCheck}><Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>✓</Text></View>}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <TouchableOpacity style={m.goBtn} onPress={startWork}>
@@ -336,7 +361,9 @@ export default function HomeDriverScreen({ navigation }) {
             <View style={{ flex: 1, marginLeft: 14 }}>
               <Text style={s.onlineTitle}>Жұмыста 🟢</Text>
               <Text style={s.onlineSub}>
-                {profile?.current_seats ?? seats} орын · Тапсырыс күтілуде
+                {profile?.current_seats ?? seats} орын · {profile?.working_routes
+                  ? profile.working_routes.split(',').length + ' маршрут'
+                  : 'Тапсырыс күтілуде'}
               </Text>
             </View>
             <TouchableOpacity style={s.stopBtn} onPress={stopWork}>
@@ -732,10 +759,22 @@ const m = StyleSheet.create({
   seatLbl:    { fontSize: 12, color: '#D1D5DB', marginTop: 6 },
   seatLblOn:  { color: 'rgba(255,255,255,0.3)' },
 
-  infoBox: { backgroundColor: '#F0FDF4', borderRadius: 18, padding: 18, marginBottom: 24, gap: 10 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
-  infoTxt: { fontSize: 14, fontWeight: '600', color: '#059669' },
+  routeTitle:   { fontSize: 13, fontWeight: '800', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 12 },
+  routeGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  routeChip:    {
+    width: '47%', flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F9FAFB', borderRadius: 16, padding: 14,
+    borderWidth: 2, borderColor: '#E5E7EB', position: 'relative',
+  },
+  routeChipOn:     { backgroundColor: '#FFF3EF', borderColor: '#FF6B35' },
+  routeChipEmoji:  { fontSize: 20 },
+  routeChipLbl:    { fontSize: 13, fontWeight: '700', color: '#6B7280', flex: 1 },
+  routeChipLblOn:  { color: '#FF6B35' },
+  routeCheck:      {
+    position: 'absolute', top: 6, right: 6,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#FF6B35', alignItems: 'center', justifyContent: 'center',
+  },
 
   goBtn:    { backgroundColor: '#FF6B35', borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginBottom: 12, shadowColor: '#FF6B35', shadowOpacity: 0.4, shadowRadius: 12, elevation: 6 },
   goBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '900' },

@@ -157,7 +157,7 @@ export default function LoginScreen() {
           <View style={s.logoCircle}>
             <Text style={s.logoEmoji}>🚖</Text>
           </View>
-          <Text style={s.appName}>Такси Жаңабазар</Text>
+          <Text style={s.appName}>ZhCity Такси</Text>
           <Text style={s.appTagline}>Жылдам · Ыңғайлы · Сенімді</Text>
         </View>
 

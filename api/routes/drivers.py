@@ -25,6 +25,7 @@ router = APIRouter()
 class StartWorkIn(BaseModel):
     seats: int
     accepts_delivery: bool = True
+    routes: list = ["local", "village_city", "city_village", "village_village"]
 
 
 class PushTokenIn(BaseModel):
@@ -41,15 +42,16 @@ async def driver_profile(uid: int = Depends(get_current_user_id)):
     count, income, debt = get_weekly_stats(uid)
 
     return {
-        "user_id":        uid,
-        "name":           user["name"],
-        "phone":          user["phone"],
-        "car_info":       user["car_info"],
-        "rating":         rating,
-        "is_online":      bool(user["is_online"]),
-        "current_seats":  user["current_seats"],
-        "debt":           user["admin_debt"],
-        "is_banned":      bool(user["is_banned"]),
+        "user_id":          uid,
+        "name":             user["name"],
+        "phone":            user["phone"],
+        "car_info":         user["car_info"],
+        "rating":           rating,
+        "is_online":        bool(user["is_online"]),
+        "current_seats":    user["current_seats"],
+        "working_routes":   user["working_routes"] or "",
+        "debt":             user["admin_debt"],
+        "is_banned":        bool(user["is_banned"]),
         "weekly_completed": count,
         "weekly_income":    income,
     }
@@ -64,10 +66,15 @@ async def start_work(data: StartWorkIn, uid: int = Depends(get_current_user_id))
     if data.seats < 1 or data.seats > 6:
         raise HTTPException(400, "Орын саны: 1–6")
 
+    valid_routes = {"local", "village_city", "city_village", "village_village"}
+    chosen_routes = [r for r in data.routes if r in valid_routes]
+    if not chosen_routes:
+        chosen_routes = ["local"]
+
     update_driver_work(
         uid,
         1,
-        "local,village_city,city_village,village_village",
+        ",".join(chosen_routes),
         data.seats,
         "all",
         1 if data.accepts_delivery else 0,

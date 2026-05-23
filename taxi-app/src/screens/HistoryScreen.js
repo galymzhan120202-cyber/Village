@@ -14,9 +14,9 @@ const STATUS = {
 };
 
 function routeLabel(o) {
-  if (o.route === 'local')           return `${o.village} ← ішінде →`;
-  if (o.route === 'village_city')    return `${o.village} → Шымкент`;
-  if (o.route === 'city_village')    return `Шымкент → ${o.village}`;
+  if (o.route === 'local')           return `${o.village} (ішінде)`;
+  if (o.route === 'village_city')    return `${o.village} → Қала`;
+  if (o.route === 'city_village')    return `Қала → ${o.village}`;
   if (o.route === 'village_village') return `${o.village} → ${o.to_loc}`;
   return o.village || '—';
 }
@@ -84,8 +84,8 @@ export default function HistoryScreen() {
         <View style={s.list}>
           {orders.map((o) => {
             const st = STATUS[o.status] || { label: o.status, bg: '#F3F4F6', color: '#6B7280', dot: '#9CA3AF' };
-            const fromAddr = o.landmark || (o.route === 'city_village' ? 'Шымкент' : o.village) || '—';
-            const toAddr   = o.to_loc || (o.route === 'village_city' ? 'Шымкент' : o.village) || '—';
+            const fromAddr = o.landmark || o.village || '—';
+            const toAddr   = o.to_loc   || o.village || '—';
 
             return (
               <View key={o.id} style={s.card}>

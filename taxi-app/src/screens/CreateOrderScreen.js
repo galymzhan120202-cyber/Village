@@ -17,8 +17,8 @@ const TABS = [
 ];
 
 const DIRECTIONS = [
-  { key: 'village_city',   icon: '🏠→🏙️', label: 'Ауылдан қалаға',  sub: 'Шымкент бағытына' },
-  { key: 'city_village',   icon: '🏙️→🏠', label: 'Қаладан ауылға',  sub: 'Ауылға қайту'      },
+  { key: 'village_city', icon: '🏠→🏙️', label: 'Ауылдан қалаға', sub: 'Қала бағытына' },
+  { key: 'city_village', icon: '🏙️→🏠', label: 'Қаладан ауылға', sub: 'Ауылға қайту'  },
 ];
 
 // ─── GPS ──────────────────────────────────────────────────────────────────────
@@ -438,13 +438,13 @@ function IntercityForm({ onSubmit, loading }) {
       </View>
 
       {/* Кету/Бару адрестері */}
-      <Label text={isVC ? 'Ауылдағы мекенжай → Шымкенттегі мекенжай' : 'Шымкенттегі мекенжай → Ауылдағы мекенжай'} />
+      <Label text={isVC ? 'Кету мекенжайы → Бару мекенжайы' : 'Кету мекенжайы → Бару мекенжайы'} />
       <View style={s.addrCard}>
         <View style={s.addrRow}>
           <View style={[s.dot, { backgroundColor: '#10B981' }]} />
           <TextInput
             style={s.addrInput}
-            placeholder={isVC ? 'Ауылдағы үй/көше...' : 'Шымкент, көше/аудан...'}
+            placeholder={isVC ? 'Ауылдағы үй/көше...' : 'Қала, көше/аудан...'}
             value={from}
             onChangeText={setFrom}
             placeholderTextColor="#9CA3AF"
@@ -455,7 +455,7 @@ function IntercityForm({ onSubmit, loading }) {
           <View style={[s.dot, { backgroundColor: '#EF4444' }]} />
           <TextInput
             style={s.addrInput}
-            placeholder={isVC ? 'Шымкент, көше/аудан...' : 'Ауылдағы үй/көше...'}
+            placeholder={isVC ? 'Қала, көше/аудан...' : 'Ауылдағы үй/көше...'}
             value={to}
             onChangeText={setTo}
             placeholderTextColor="#9CA3AF"
@@ -469,7 +469,7 @@ function IntercityForm({ onSubmit, loading }) {
 
       {/* Баға */}
       <Label text="Баға (теңге)" />
-      <PriceHint text="Ауыл–Шымкент орташа: 1000–2500 тг/орын" />
+      <PriceHint text="Қалааралық орташа: 1000–3000 тг/орын" />
       <TextInput
         style={s.input}
         placeholder="1500"

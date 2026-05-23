@@ -53,7 +53,7 @@ function AppNavigator() {
             <Stack.Screen
               name="HomePassenger"
               component={HomePassengerScreen}
-              options={{ title: '🚖 Такси Жаңабазар', headerShown: false }}
+              options={{ title: '🚖 ZhCity Такси', headerShown: false }}
             />
             <Stack.Screen
               name="CreateOrder"

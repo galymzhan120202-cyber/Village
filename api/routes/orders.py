@@ -159,10 +159,12 @@ async def available_orders(uid: int = Depends(get_current_user_id)):
             from_addr = f"{village}, {land}"
             to_addr   = to_loc
         elif route == "village_city":
+            # to_loc жолаушы толық мекенжай жазады (қала атауымен)
             from_addr = f"{village}, {land}"
-            to_addr   = f"Шымкент, {to_loc}"
-        else:
-            from_addr = f"Шымкент, {land}"
+            to_addr   = to_loc
+        else:  # city_village
+            # land жолаушы толық мекенжай жазады (қала атауымен)
+            from_addr = land
             to_addr   = f"{village}, {to_loc}"
 
         result.append({
